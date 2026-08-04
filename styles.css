@@ -1106,9 +1106,29 @@ textarea {
 }
 
 .upload-status {
+  display: grid;
+  gap: 6px;
   min-height: 18px;
   color: var(--primary);
   font-size: 13px;
+}
+
+.upload-status i {
+  display: block;
+  width: min(280px, 100%);
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.upload-status i::before {
+  display: block;
+  width: var(--progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--primary);
+  content: "";
 }
 
 .drive-attachment {

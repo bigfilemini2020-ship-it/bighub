@@ -209,6 +209,15 @@ async function authHeaders() {
   return { Authorization: `Bearer ${token}` };
 }
 
+function setUploadStatus(message, progress = 0) {
+  const status = byId("driveUploadStatus");
+  if (!status) return;
+  const safeProgress = Math.max(0, Math.min(100, Math.round(progress)));
+  status.innerHTML = message
+    ? `<span>${escapeHtml(message)}</span><i style="--progress:${safeProgress}%"></i>`
+    : "";
+}
+
 async function uploadDriveFile(file) {
   const headers = await authHeaders();
   const sessionResponse = await fetch("/api/drive/create-upload", {
@@ -218,13 +227,31 @@ async function uploadDriveFile(file) {
   });
   const session = await sessionResponse.json().catch(() => ({}));
   if (!sessionResponse.ok) throw new Error(session.error || "Drive 업로드 준비에 실패했습니다.");
-  const uploadResponse = await fetch(session.uploadUrl, {
-    method: "PUT",
-    headers: { "content-type": file.type || "application/octet-stream" },
-    body: file,
-  });
-  const uploaded = await uploadResponse.json().catch(() => ({}));
-  if (!uploadResponse.ok || !uploaded.id) throw new Error(uploaded.error?.message || "Drive 업로드에 실패했습니다.");
+
+  const chunkSize = 3 * 1024 * 1024;
+  let uploaded;
+  for (let start = 0; start < file.size; start += chunkSize) {
+    const end = Math.min(start + chunkSize, file.size) - 1;
+    const chunk = file.slice(start, end + 1);
+    setUploadStatus(`Drive에 업로드 중... ${Math.round(((end + 1) / file.size) * 100)}%`, ((end + 1) / file.size) * 100);
+    const uploadResponse = await fetch("/api/drive/upload-chunk", {
+      method: "POST",
+      headers: {
+        ...headers,
+        "content-type": file.type || "application/octet-stream",
+        "x-upload-url": session.uploadUrl,
+        "x-upload-start": String(start),
+        "x-upload-end": String(end),
+        "x-upload-size": String(file.size),
+      },
+      body: chunk,
+    });
+    const result = await uploadResponse.json().catch(() => ({}));
+    if (!uploadResponse.ok) throw new Error(result.error || "Drive 업로드에 실패했습니다.");
+    if (result.done) uploaded = result.file;
+  }
+
+  if (!uploaded?.id) throw new Error("Drive 업로드가 완료되지 않았습니다.");
   return {
     id: uploaded.id,
     name: uploaded.name || file.name,
@@ -315,13 +342,13 @@ function bindForms() {
     const submitButton = form.querySelector("button[type='submit']");
     try {
       if (file) {
-        if (status) status.textContent = "Drive에 업로드 중...";
+        setUploadStatus("Drive 업로드 준비 중...", 5);
         if (submitButton) submitButton.disabled = true;
         const uploaded = await uploadDriveFile(file);
         data.attachmentUrl = uploaded.downloadUrl;
         data.attachmentName = uploaded.name;
         data.attachmentMimeType = uploaded.mimeType;
-        if (status) status.textContent = "업로드 완료";
+        setUploadStatus("업로드 완료", 100);
       }
       delete data.driveFile;
       data.targetUserIds = data.type === "mission" ? formData.getAll("targetUserIds") : [];
@@ -336,12 +363,12 @@ function bindForms() {
         saveState();
       }
       form.reset();
-      if (status) status.textContent = "";
+      setUploadStatus("");
       closeComposeModal();
       activeView = "feed";
       render();
     } catch (error) {
-      if (status) status.textContent = error.message || "파일 업로드에 실패했습니다.";
+      setUploadStatus(error.message || "파일 업로드에 실패했습니다.");
       alert(error.message || "파일 업로드에 실패했습니다.");
     } finally {
       if (submitButton) submitButton.disabled = false;
