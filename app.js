@@ -135,21 +135,109 @@ function bindNavigation() {
 
 function openComposeModal() { if (!currentUser()) return; byId("composeModal").classList.remove("hidden"); byId("postForm").querySelector("input[name='title']").focus(); }
 function closeComposeModal() { byId("composeModal").classList.add("hidden"); }
+async function authHeaders() {
+  if (!remoteAuth()) throw new Error("Supabase 로그인이 필요합니다.");
+  const token = await window.BigHubSupabase.accessToken();
+  if (!token) throw new Error("로그인 세션이 만료됐습니다. 다시 로그인하세요.");
+  return { Authorization: `Bearer ${token}` };
+}
+
+async function uploadDriveFile(file) {
+  const headers = await authHeaders();
+  const sessionResponse = await fetch("/api/drive/create-upload", {
+    method: "POST",
+    headers: { ...headers, "content-type": "application/json" },
+    body: JSON.stringify({ name: file.name, mimeType: file.type || "application/octet-stream", size: file.size }),
+  });
+  const session = await sessionResponse.json().catch(() => ({}));
+  if (!sessionResponse.ok) throw new Error(session.error || "Drive 업로드 준비에 실패했습니다.");
+  const uploadResponse = await fetch(session.uploadUrl, {
+    method: "PUT",
+    headers: { "content-type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  const uploaded = await uploadResponse.json().catch(() => ({}));
+  if (!uploadResponse.ok || !uploaded.id) throw new Error(uploaded.error?.message || "Drive 업로드에 실패했습니다.");
+  return {
+    id: uploaded.id,
+    name: uploaded.name || file.name,
+    downloadUrl: `/api/drive/download?id=${encodeURIComponent(uploaded.id)}&name=${encodeURIComponent(uploaded.name || file.name)}`,
+  };
+}
+
+async function downloadDriveFile(url, postId) {
+  const response = await fetch(url, { headers: await authHeaders() });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || "파일 다운로드에 실패했습니다.");
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") || "";
+  const match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  const fallback = new URL(url, location.href).searchParams.get("name") || "download";
+  const filename = match ? decodeURIComponent(match[1]) : fallback;
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+  state = S.recordFileDownload(state, { postId, userId: currentUserId });
+  saveState();
+}
+
+function isDriveDownloadUrl(url) {
+  return String(url || "").startsWith("/api/drive/download");
+}
+
+function driveFileName(url) {
+  try { return new URL(url, location.href).searchParams.get("name") || "Drive 파일"; } catch { return "Drive 파일"; }
+}
+
+function attachmentHtml(post) {
+  if (!post.attachmentUrl) return "";
+  if (isDriveDownloadUrl(post.attachmentUrl)) {
+    return `<div class="attachment-line drive-attachment"><span>Google Drive · ${escapeHtml(driveFileName(post.attachmentUrl))}</span><button class="mini-button" data-action="download-file" data-post-id="${post.id}" data-url="${escapeHtml(post.attachmentUrl)}" type="button">다운로드</button></div>`;
+  }
+  return `<div class="attachment-line">${linkHtml(post.attachmentUrl, "첨부파일 열기")}</div>`;
+}
 
 function bindForms() {
   renderMissionTargets();
-  byId("postForm").addEventListener("submit", (event) => {
+  byId("postForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    data.targetUserIds = formData.getAll("targetUserIds");
-    data.completionRules = formData.getAll("completionRules");
-    state = S.addPost(state, { ...data, authorId: currentUserId });
-    saveState();
-    event.currentTarget.reset();
-    closeComposeModal();
-    activeView = "feed";
-    render();
+    const file = byId("driveFileInput")?.files?.[0];
+    const status = byId("driveUploadStatus");
+    const submitButton = form.querySelector("button[type='submit']");
+    try {
+      if (file) {
+        if (status) status.textContent = "Drive에 업로드 중...";
+        if (submitButton) submitButton.disabled = true;
+        const uploaded = await uploadDriveFile(file);
+        data.attachmentUrl = uploaded.downloadUrl;
+        if (status) status.textContent = "업로드 완료";
+      }
+      delete data.driveFile;
+      data.targetUserIds = formData.getAll("targetUserIds");
+      data.completionRules = formData.getAll("completionRules");
+      state = S.addPost(state, { ...data, authorId: currentUserId });
+      saveState();
+      form.reset();
+      if (status) status.textContent = "";
+      closeComposeModal();
+      activeView = "feed";
+      render();
+    } catch (error) {
+      if (status) status.textContent = error.message || "파일 업로드에 실패했습니다.";
+      alert(error.message || "파일 업로드에 실패했습니다.");
+    } finally {
+      if (submitButton) submitButton.disabled = false;
+    }
   });
 }
 
@@ -191,7 +279,7 @@ function postCardHtml(post) {
   const mediaUrl = post.mediaUrl || post.videoUrl || post.attachmentUrl;
   const presentation = S.getPostPresentation(post);
   const cardClass = presentation.kind === "text" ? "feed-card text-card" : "feed-card media-card";
-  return `<article class="${cardClass}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><span class="post-type">${postTypeLabel(post.type)}</span></header>${presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post.title) : ""}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p>${escapeHtml(post.body)}</p>${post.attachmentUrl ? `<div class="attachment-line">${linkHtml(post.attachmentUrl, "첨부파일 열기")}</div>` : ""}<p class="feed-counts">좋아요 ${likeCount} · 완료 ${doneCount}/${completion.totalMembers} · 댓글 ${comments.length}</p><div class="feed-actions">${actionButton(post.id, "like", mine, "heart", "좋아요")}${actionButton(post.id, "done", mine, "check", "완료")}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글</span></button>${post.attachmentUrl ? `<a class="save-link" href="${escapeHtml(post.attachmentUrl)}" target="_blank" rel="noreferrer" title="저장/열기" data-action="download-file" data-post-id="${post.id}">⇩</a>` : ""}</div>${comments.length ? `<div class="comment-list">${comments.map(commentHtml).join("")}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요. 댓글도 완료로 기록됩니다." required /><button type="submit">게시</button></form></section></article>`;
+  return `<article class="${cardClass}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><span class="post-type">${postTypeLabel(post.type)}</span></header>${presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post.title) : ""}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p>${escapeHtml(post.body)}</p>${attachmentHtml(post)}<p class="feed-counts">좋아요 ${likeCount} · 완료 ${doneCount}/${completion.totalMembers} · 댓글 ${comments.length}</p><div class="feed-actions">${actionButton(post.id, "like", mine, "heart", "좋아요")}${actionButton(post.id, "done", mine, "check", "완료")}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글</span></button>${post.attachmentUrl ? `<a class="save-link" href="${escapeHtml(post.attachmentUrl)}" target="_blank" rel="noreferrer" title="저장/열기" data-action="download-file" data-post-id="${post.id}" data-url="${escapeHtml(post.attachmentUrl)}">⇩</a>` : ""}</div>${comments.length ? `<div class="comment-list">${comments.map(commentHtml).join("")}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요. 댓글도 완료로 기록됩니다." required /><button type="submit">게시</button></form></section></article>`;
 }
 
 function actionButton(postId, sticker, mine, icon, label) { const active = mine.some((reaction) => reaction.sticker === sticker) ? " active" : ""; return `<button class="icon-action ${sticker}${active}" data-action="reaction" data-post-id="${postId}" data-sticker="${sticker}" type="button" title="${label}" aria-label="${label}">${iconSvg(icon)}<span>${label}</span></button>`; }
@@ -209,8 +297,28 @@ function renderApprovals() { const panel = byId("approvalPanel"); const pending 
 function renderCalendar() { const posts = state.posts.filter((post) => post.startDate || post.dueDate).sort((a, b) => String(a.dueDate || a.startDate).localeCompare(String(b.dueDate || b.startDate))); byId("calendarList").innerHTML = posts.length ? posts.map((post) => `<div class="mini-item calendar-item"><div><strong>${escapeHtml(post.title)}</strong><span>${postTypeLabel(post.type)} · ${escapeHtml(dateText(post).replace(/^ · /, ""))}</span></div></div>`).join("") : `<div class="mini-empty">등록된 일정 없음</div>`; }
 function formatDate(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "방금" : `${date.getMonth() + 1}.${date.getDate()}`; }
 
-document.addEventListener("click", (event) => { const focusTarget = event.target.closest("[data-focus-comment]"); if (focusTarget) { const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; } const target = event.target.closest("[data-action]"); if (!target || target.tagName === "FORM") return; if (target.dataset.action === "reaction") state = S.addReaction(state, { postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker });
-  if (target.dataset.action === "download-file") state = S.recordFileDownload(state, { postId: target.dataset.postId, userId: currentUserId }); if (target.dataset.action === "approve-signup") { if (remoteAuth()) { window.BigHubSupabase.approveProfile(target.dataset.requestId).then(refreshRemoteUsers).then(render); return; } state = S.approveSignupRequest(state, target.dataset.requestId); } saveState(); render(); });
+document.addEventListener("click", async (event) => {
+  const focusTarget = event.target.closest("[data-focus-comment]");
+  if (focusTarget) { const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
+  const target = event.target.closest("[data-action]");
+  if (!target || target.tagName === "FORM") return;
+  if (target.dataset.action === "reaction") state = S.addReaction(state, { postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker });
+  if (target.dataset.action === "download-file") {
+    const url = target.dataset.url || target.href;
+    if (!isDriveDownloadUrl(url)) {
+      state = S.recordFileDownload(state, { postId: target.dataset.postId, userId: currentUserId });
+      saveState();
+      return;
+    }
+    event.preventDefault();
+    try { await downloadDriveFile(url, target.dataset.postId); } catch (error) { alert(error.message || "파일 다운로드에 실패했습니다."); }
+    render();
+    return;
+  }
+  if (target.dataset.action === "approve-signup") { if (remoteAuth()) { window.BigHubSupabase.approveProfile(target.dataset.requestId).then(refreshRemoteUsers).then(render); return; } state = S.approveSignupRequest(state, target.dataset.requestId); }
+  saveState();
+  render();
+});
 
 document.addEventListener("submit", (event) => { const form = event.target.closest("[data-action]"); if (!form) return; event.preventDefault(); const data = Object.fromEntries(new FormData(form)); if (form.dataset.action === "comment") state = S.addComment(state, { ...data, postId: form.dataset.postId, userId: currentUserId }); saveState(); form.reset(); render(); });
 

@@ -84,6 +84,11 @@
     return toUser(profile);
   }
 
+  async function accessToken() {
+    const { data } = await client().auth.getSession();
+    return data.session?.access_token || "";
+  }
+
   async function signOut() {
     await client().auth.signOut();
   }
@@ -108,5 +113,5 @@
     if (error) throw new Error(userMessage(error, "가입 승인 처리에 실패했습니다."));
   }
 
-  root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, approveProfile };
+  root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, approveProfile, accessToken };
 })(window);
