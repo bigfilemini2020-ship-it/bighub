@@ -22,6 +22,9 @@
     if (text.includes("invalid login credentials")) return "아이디 또는 비밀번호가 맞지 않습니다.";
     if (text.includes("email not confirmed")) return "계정 확인이 아직 완료되지 않았습니다. 관리자에게 확인을 요청하세요.";
     if (text.includes("permission denied") || text.includes("row-level security") || code === "42501") {
+      if (fallback && fallback.includes("게시글")) return "게시글 저장 권한이 없습니다. Supabase SQL 업데이트를 다시 실행하세요.";
+      if (fallback && fallback.includes("댓글")) return "댓글 저장 권한이 없습니다. Supabase SQL 업데이트를 다시 실행하세요.";
+      if (fallback && fallback.includes("반응")) return "좋아요/완료 저장 권한이 없습니다. Supabase SQL 업데이트를 다시 실행하세요.";
       return "가입/로그인 정보 저장 권한이 없습니다. 관리자에게 Supabase SQL 업데이트를 요청하세요.";
     }
     if (code === "pgrst116" || text.includes("json object requested")) return "가입 신청 정보가 아직 생성되지 않았습니다. 관리자에게 Supabase SQL 업데이트를 요청하세요.";
