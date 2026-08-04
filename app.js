@@ -357,7 +357,7 @@ function attachmentHtml(post) {
   if (isDriveDownloadUrl(post.attachmentUrl)) {
     const name = post.attachmentName || driveFileName(post.attachmentUrl);
     const kind = isVideoAttachment(post) ? "영상" : "파일";
-    return `<div class="attachment-line drive-attachment"><span><strong>${kind}</strong>${escapeHtml(name)}</span><button class="mini-button" data-action="download-file" data-post-id="${post.id}" data-url="${escapeHtml(post.attachmentUrl)}" type="button">다운로드</button></div>`;
+    return `<div class="attachment-line drive-attachment"><span><strong>${kind}</strong>${escapeHtml(name)}</span></div>`;
   }
   return `<div class="attachment-line">${linkHtml(post.attachmentUrl, "첨부파일 열기")}</div>`;
 }
@@ -366,9 +366,9 @@ function attachmentHtml(post) {
 function saveControlHtml(post) {
   if (!post.attachmentUrl) return "";
   if (isDriveDownloadUrl(post.attachmentUrl)) {
-    return `<button class="save-link" data-action="download-file" data-post-id="${post.id}" data-url="${escapeHtml(post.attachmentUrl)}" type="button" title="다운로드" aria-label="다운로드">⇩</button>`;
+    return `<button class="save-link" data-action="download-file" data-post-id="${post.id}" data-url="${escapeHtml(post.attachmentUrl)}" type="button" title="다운로드" aria-label="다운로드">${iconSvg("download")}</button>`;
   }
-  return `<a class="save-link" href="${escapeHtml(post.attachmentUrl)}" target="_blank" rel="noreferrer" title="저장/열기" data-action="download-file" data-post-id="${post.id}" data-url="${escapeHtml(post.attachmentUrl)}">⇩</a>`;
+  return `<a class="save-link" href="${escapeHtml(post.attachmentUrl)}" target="_blank" rel="noreferrer" title="저장/열기" data-action="download-file" data-post-id="${post.id}" data-url="${escapeHtml(post.attachmentUrl)}">${iconSvg("download")}</a>`;
 }
 function updateMissionSettings() {
   const type = byId("postTypeSelect")?.value;
@@ -480,7 +480,7 @@ function postCardHtml(post) {
 }
 
 function actionButton(postId, sticker, mine, icon, label) { const active = mine.some((reaction) => reaction.sticker === sticker) ? " active" : ""; return `<button class="icon-action ${sticker}${active}" data-action="reaction" data-post-id="${postId}" data-sticker="${sticker}" type="button" title="${label}" aria-label="${label}">${iconSvg(icon)}<span>${label}</span></button>`; }
-function iconSvg(name) { const icons = { heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.2-4.4-9.5-9.1C.7 8.2 2.9 4.5 6.7 4.5c2 0 3.7 1.1 4.7 2.7 1-1.6 2.7-2.7 4.7-2.7 3.8 0 6 3.7 4.2 7.4C19.2 16.6 12 21 12 21Z"/></svg>`, check: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`, comment: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.4 9.6 9.6 0 0 1-4-.8L3 20l1.1-4.4A8.1 8.1 0 0 1 3 11.5C3 6.8 7 3 12 3s9 3.8 9 8.5Z"/></svg>` }; return icons[name] || name; }
+function iconSvg(name) { const icons = { heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.2-4.4-9.5-9.1C.7 8.2 2.9 4.5 6.7 4.5c2 0 3.7 1.1 4.7 2.7 1-1.6 2.7-2.7 4.7-2.7 3.8 0 6 3.7 4.2 7.4C19.2 16.6 12 21 12 21Z"/></svg>`, check: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`, comment: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.4 9.6 9.6 0 0 1-4-.8L3 20l1.1-4.4A8.1 8.1 0 0 1 3 11.5C3 6.8 7 3 12 3s9 3.8 9 8.5Z"/></svg>`, download: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>` }; return icons[name] || name; }
 function mediaPreviewHtml(url, post) {
   if (isDriveDownloadUrl(url) && isVideoAttachment(post)) {
     return `<div class="media-preview video-preview"><video class="drive-video" controls preload="metadata" playsinline data-drive-src="${escapeHtml(`${url}&inline=1`)}"></video></div>`;

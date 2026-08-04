@@ -1134,7 +1134,6 @@ textarea {
 .drive-attachment {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid var(--line);
@@ -1521,4 +1520,17 @@ textarea {
   .post-edit-button {
     padding: 0 8px;
   }
+}
+.save-link svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.drive-attachment .mini-button {
+  display: none;
 }
