@@ -44,17 +44,33 @@ async function restoreRemoteSession() {
     const profile = await window.BigHubSupabase.currentProfile();
     if (!profile) return;
     currentUserId = profile.id;
-    await refreshRemoteData();
+    mergeRemoteUser(profile);
+    await tryRefreshRemoteData();
   } catch (error) {
     console.warn(error);
   }
 }
 
+function mergeRemoteUser(user) {
+  state = { ...state, users: [user, ...state.users.filter((item) => item.id !== user.id)] };
+}
+
 async function refreshRemoteData() {
   if (!remoteAuth()) return;
   const users = await window.BigHubSupabase.listProfiles();
+  state = { ...state, users };
   const content = await window.BigHubSupabase.listContent();
-  state = { ...state, users, ...content };
+  state = { ...state, ...content };
+}
+
+async function tryRefreshRemoteData() {
+  try {
+    await refreshRemoteData();
+    return "";
+  } catch (error) {
+    console.warn(error);
+    return error.message || "게시글 동기화에 실패했습니다.";
+  }
 }
 
 function setupAuthForms() {
@@ -85,12 +101,14 @@ function bindAuthForms() {
       const user = remoteAuth() ? await window.BigHubSupabase.signIn(data) : S.authenticateUser(state, data);
       if (!user) { byId("loginMessage").textContent = "승인된 계정이 없거나 비밀번호가 맞지 않습니다."; return; }
       currentUserId = user.id;
+      if (remoteAuth()) mergeRemoteUser(user);
       const rememberId = byId("rememberId").checked || byId("autoLogin").checked;
       if (rememberId) localStorage.setItem(rememberedLoginIdKey, data.loginId || ""); else localStorage.removeItem(rememberedLoginIdKey);
       setSession(currentUserId, byId("autoLogin").checked);
-      if (remoteAuth()) await refreshRemoteData();
+      const syncError = remoteAuth() ? await tryRefreshRemoteData() : "";
       byId("loginMessage").textContent = "";
       render();
+      if (syncError) alert(`로그인은 됐지만 게시글 동기화에 실패했습니다. Supabase SQL 업데이트가 필요합니다.\n\n${syncError}`);
     } catch (error) {
       byId("loginMessage").textContent = error.message || "로그인에 실패했습니다.";
     }
