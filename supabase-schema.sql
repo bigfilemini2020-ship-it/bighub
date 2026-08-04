@@ -99,6 +99,53 @@ as $$
   );
 $$;
 
+
+create or replace function public.handle_new_user_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  requested_login_id text := lower(coalesce(new.raw_user_meta_data->>'login_id', split_part(new.email, '@', 1)));
+  requested_name text := coalesce(nullif(new.raw_user_meta_data->>'name', ''), requested_login_id);
+  requested_department text := coalesce(nullif(new.raw_user_meta_data->>'department', ''), '기타');
+begin
+  if requested_department not in ('임원', '경영지원', '개발', '운영', '마케팅', '기타') then
+    requested_department := '기타';
+  end if;
+
+  insert into public.profiles (id, login_id, auth_email, name, department, role, status, avatar)
+  values (new.id, requested_login_id, new.email, requested_name, requested_department, 'member', 'pending', left(requested_name, 1))
+  on conflict (id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_user_profile();
+
+-- Repair Auth users created before the trigger existed.
+insert into public.profiles (id, login_id, auth_email, name, department, role, status, avatar)
+select
+  u.id,
+  lower(coalesce(u.raw_user_meta_data->>'login_id', split_part(u.email, '@', 1))),
+  u.email,
+  coalesce(nullif(u.raw_user_meta_data->>'name', ''), split_part(u.email, '@', 1)),
+  case
+    when coalesce(u.raw_user_meta_data->>'department', '') in ('임원', '경영지원', '개발', '운영', '마케팅', '기타') then u.raw_user_meta_data->>'department'
+    else '기타'
+  end,
+  'member',
+  'pending',
+  left(coalesce(nullif(u.raw_user_meta_data->>'name', ''), split_part(u.email, '@', 1)), 1)
+from auth.users u
+where u.email <> 'admin@bighub.local'
+  and not exists (select 1 from public.profiles p where p.id = u.id)
+on conflict (id) do nothing;
 drop policy if exists "profiles insert own pending" on public.profiles;
 create policy "profiles insert own pending" on public.profiles
 for insert to authenticated

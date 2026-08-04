@@ -39,17 +39,13 @@
     });
     if (error) throw error;
     if (!data.user) throw new Error("가입 계정을 만들지 못했습니다.");
-    const { error: profileError } = await auth.from("profiles").insert({
-      id: data.user.id,
-      login_id: loginId,
-      auth_email: authEmail,
-      name: input.name,
-      department: input.department,
-      role: "member",
-      status: "pending",
-      avatar: String(input.name || "?").slice(0, 1),
-    });
-    if (profileError) throw profileError;
+    const { data: profile, error: profileError } = await auth
+      .from("profiles")
+      .select("id,status")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    if (profileError) throw new Error("가입 신청 저장 권한 설정이 필요합니다. 관리자에게 Supabase SQL 업데이트를 요청하세요.");
+    if (!profile) throw new Error("가입 신청 저장 설정이 아직 적용되지 않았습니다. Supabase SQL 업데이트 후 다시 신청하세요.");
     await auth.auth.signOut();
   }
 

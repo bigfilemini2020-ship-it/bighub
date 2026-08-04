@@ -113,9 +113,12 @@ function bindAuthForms() {
       if (remoteAuth()) await refreshRemoteUsers();
       setAuthMode("login");
       byId("loginMessage").textContent = "가입 신청이 접수됐습니다. 승인 후 로그인하세요.";
+      alert("가입 신청이 접수됐습니다. 관리자 승인 후 로그인할 수 있습니다.");
       render();
     } catch (error) {
-      byId("signupMessage").textContent = error.message;
+      const message = error.message || "가입 신청에 실패했습니다.";
+      byId("signupMessage").textContent = message;
+      alert(`가입 신청 실패: ${message}`);
     }
   });
 }
