@@ -199,8 +199,16 @@ function attachmentHtml(post) {
   return `<div class="attachment-line">${linkHtml(post.attachmentUrl, "첨부파일 열기")}</div>`;
 }
 
+function updateMissionSettings() {
+  const type = byId("postTypeSelect")?.value;
+  const settings = byId("missionSettings");
+  if (settings) settings.classList.toggle("hidden", type !== "mission");
+}
+
 function bindForms() {
   renderMissionTargets();
+  updateMissionSettings();
+  byId("postTypeSelect")?.addEventListener("change", updateMissionSettings);
   byId("postForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -218,8 +226,8 @@ function bindForms() {
         if (status) status.textContent = "업로드 완료";
       }
       delete data.driveFile;
-      data.targetUserIds = formData.getAll("targetUserIds");
-      data.completionRules = formData.getAll("completionRules");
+      data.targetUserIds = data.type === "mission" ? formData.getAll("targetUserIds") : [];
+      data.completionRules = data.type === "mission" ? formData.getAll("completionRules") : [];
       state = S.addPost(state, { ...data, authorId: currentUserId });
       saveState();
       form.reset();
