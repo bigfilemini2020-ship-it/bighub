@@ -2,6 +2,7 @@ const storeKey = "bighub-state-v5";
 const sessionKey = "bighub-session-v1";
 const rememberedLoginIdKey = "bighub-remembered-login-id";
 const autoLoginKey = "bighub-auto-login";
+const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -202,15 +203,40 @@ function driveFileKey(file) {
   return file ? `${file.name}:${file.size}:${file.lastModified}` : "";
 }
 
+function loadUploadedAttachment(file) {
+  const key = driveFileKey(file);
+  if (!key) return null;
+  if (uploadedAttachment?.fileKey === key) return uploadedAttachment;
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(uploadedAttachmentKey) || "null");
+    if (cached?.fileKey === key && cached.downloadUrl) {
+      uploadedAttachment = cached;
+      return cached;
+    }
+  } catch {}
+  return null;
+}
+
+function rememberUploadedAttachment(value) {
+  uploadedAttachment = value;
+  if (value?.downloadUrl) sessionStorage.setItem(uploadedAttachmentKey, JSON.stringify(value));
+}
+
+function clearUploadedAttachment() {
+  uploadedAttachment = null;
+  sessionStorage.removeItem(uploadedAttachmentKey);
+}
+
 function updateDriveFileStatus() {
   const file = byId("driveFileInput")?.files?.[0];
   const status = byId("driveUploadStatus");
   if (!status) return;
   if (!file) {
-    uploadedAttachment = null;
+    clearUploadedAttachment();
     status.textContent = "";
     return;
   }
+  loadUploadedAttachment(file);
   if (uploadedAttachment?.fileKey !== driveFileKey(file)) uploadedAttachment = null;
   status.textContent = uploadedAttachment
     ? `업로드 완료: ${uploadedAttachment.name}`
@@ -357,10 +383,11 @@ function bindForms() {
     try {
       if (file) {
         if (submitButton) submitButton.disabled = true;
-        if (!uploadedAttachment || uploadedAttachment.fileKey !== driveFileKey(file)) {
+        const cachedUpload = loadUploadedAttachment(file);
+        if (!cachedUpload) {
           setUploadStatus("Drive 업로드 준비 중...", 5);
           const uploaded = await uploadDriveFile(file);
-          uploadedAttachment = { ...uploaded, fileKey: driveFileKey(file) };
+          rememberUploadedAttachment({ ...uploaded, fileKey: driveFileKey(file) });
           setUploadStatus("업로드 완료", 100);
         } else {
           setUploadStatus("이미 업로드된 파일 연결 중...", 100);
@@ -382,6 +409,7 @@ function bindForms() {
         saveState();
       }
       form.reset();
+      clearUploadedAttachment();
       setUploadStatus("");
       closeComposeModal();
       activeView = "feed";
