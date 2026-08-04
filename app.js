@@ -1,4 +1,4 @@
-const storeKey = "bighub-state-v4";
+const storeKey = "bighub-state-v5";
 const sessionKey = "bighub-session-v1";
 const rememberedLoginIdKey = "bighub-remembered-login-id";
 const autoLoginKey = "bighub-auto-login";
@@ -12,12 +12,7 @@ let postFilter = "all";
 function loadState() {
   const saved = localStorage.getItem(storeKey);
   if (saved) return JSON.parse(saved);
-  let initial = S.createInitialState();
-  initial = S.addPost(initial, { type: "notice", title: "1주차 공지", body: "영상 또는 HTML 자료를 보고 댓글을 남기거나 완료 버튼을 눌러주세요.", authorId: "u-admin", mediaUrl: "https://youtu.be/abc123", attachmentUrl: "https://drive.google.com/", startDate: "2026-08-04", dueDate: "2026-08-08" });
-  initial = S.addPost(initial, { type: "mission", title: "프롬프트 실습", body: "업무 자동화에 쓸 수 있는 프롬프트 예시를 확인하고 적용 아이디어를 댓글로 남겨주세요.", authorId: "u-admin", mediaUrl: "https://example.com/course.html", dueDate: "2026-08-12" });
-  initial = S.addPost(initial, { type: "question", title: "파일 첨부 질문", body: "오류 화면 캡처를 첨부해서 질문하는 예시입니다.", authorId: "u-1", attachmentUrl: "https://example.com/error.png" });
-  initial = S.addPost(initial, { type: "general", title: "오늘 공유 메모", body: "텍스트 게시글은 이미지 없이도 빠르게 읽히는 스레드형 카드로 표시됩니다.", authorId: "u-admin" });
-  return initial;
+  return S.createInitialState();
 }
 
 function saveState() { localStorage.setItem(storeKey, JSON.stringify(state)); }
