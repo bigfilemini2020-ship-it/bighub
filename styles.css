@@ -786,8 +786,9 @@ textarea {
 }
 
 .feed-actions {
-  gap: 10px;
-  padding: 12px 0 4px;
+  gap: 12px;
+  padding: 14px 0 10px;
+  margin-top: 14px;
 }
 
 .icon-action {
@@ -843,14 +844,12 @@ textarea {
 }
 
 .media-card .feed-body .feed-actions {
-  margin-left: -12px;
-  margin-right: -12px;
+  margin-left: -2px;
+  margin-right: -2px;
 }
 
 .feed-counts {
-  margin-top: 12px;
-  color: #0f172a;
-  font-size: 13px;
+  display: none;
 }
 
 .save-link {
@@ -1255,17 +1254,17 @@ textarea {
 }
 
 .feed-counts {
-  margin: 13px 0 4px;
-  color: #111827;
+  display: none;
 }
 
 .feed-actions {
-  padding: 8px 0 2px;
+  padding: 14px 0 10px;
+  margin-top: 14px;
 }
 
 .icon-action,
 .save-link {
-  min-height: 40px;
+  min-height: 42px;
 }
 
 .save-link {
@@ -1278,6 +1277,7 @@ textarea {
 .inline-form {
   grid-template-columns: minmax(0, 1fr) 58px;
   align-items: center;
+  margin-top: 8px;
 }
 
 .inline-form input {
