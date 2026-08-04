@@ -515,9 +515,17 @@ function canEditPost(post) { const item = currentUser(); return Boolean(item && 
 
 function renderFeed() {
   document.querySelectorAll(".filter-chip").forEach((button) => button.classList.toggle("active", button.dataset.filter === postFilter));
-  const posts = state.posts.filter((post) => postFilter === "all" || post.type === postFilter);
+  const posts = sortFeedPosts(state.posts.filter((post) => postFilter === "all" || post.type === postFilter));
   byId("postList").innerHTML = posts.length ? posts.map(postCardHtml).join("") : emptyHtml();
   hydrateDriveVideos();
+}
+
+function sortFeedPosts(posts) {
+  return [...posts].sort((a, b) => {
+    const noticeOrder = Number(b.type === "notice") - Number(a.type === "notice");
+    if (noticeOrder) return noticeOrder;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
 
 function postCardHtml(post) {
@@ -578,13 +586,17 @@ document.addEventListener("click", async (event) => {
   if (!target || target.tagName === "FORM") return;
   if (target.dataset.action === "edit-post") { openEditModal(target.dataset.postId); return; }
   if (target.dataset.action === "reaction") {
+    const reaction = { postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker };
     if (remoteAuth()) {
-      try { await window.BigHubSupabase.addReaction({ postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker }); await refreshRemoteData(); }
-      catch (error) { alert(error.message || "반응 저장에 실패했습니다."); }
+      const previousState = state;
+      state = S.addReaction(state, reaction);
+      render();
+      try { await window.BigHubSupabase.addReaction(reaction); await refreshRemoteData(); }
+      catch (error) { state = previousState; alert(error.message || "반응 저장에 실패했습니다."); }
       render();
       return;
     }
-    state = S.addReaction(state, { postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker });
+    state = S.addReaction(state, reaction);
   }
   if (target.dataset.action === "download-file") {
     const url = target.dataset.url || target.href;
