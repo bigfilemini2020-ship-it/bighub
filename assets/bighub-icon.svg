@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="BigHub">
+  <defs>
+    <linearGradient id="bg" x1="18" y1="14" x2="112" y2="118" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.55" stop-color="#111827"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="38" y1="32" x2="91" y2="94" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dbeafe"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+  <path d="M35 38h25c13 0 21 7 21 18 0 6-3 11-8 14 7 3 12 9 12 18 0 13-10 21-25 21H35V38Zm19 28h5c5 0 8-3 8-7s-3-7-8-7h-5v14Zm0 28h8c6 0 9-3 9-8s-3-8-9-8h-8v16Z" fill="url(#mark)"/>
+  <path d="M89 39h17v70H89V82H72V66h17V39Z" fill="#93c5fd"/>
+  <circle cx="97" cy="29" r="7" fill="#22c55e"/>
+</svg>

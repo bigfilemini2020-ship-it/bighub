@@ -1424,3 +1424,42 @@ textarea {
     padding-left: 14px;
   }
 }
+/* Brand icon */
+.brand-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: block;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+}
+
+.brand-icon.small {
+  width: 38px;
+  height: 38px;
+  flex-basis: 38px;
+}
+
+.avatar.admin-icon,
+.avatar.current.admin-icon {
+  border: 0;
+  background: #111827 url("assets/bighub-icon.svg") center / cover no-repeat;
+  color: transparent;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
+}
+
+.avatar.admin-icon::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #22c55e;
+}
+
+.avatar {
+  position: relative;
+}

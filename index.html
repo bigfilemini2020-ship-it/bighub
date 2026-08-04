@@ -4,13 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BigHub</title>
-    <link rel="icon" type="image/png" href="assets/bighub-icon.png" />
-    <link rel="stylesheet" href="styles.css?v=sns-ui-1" />
+    <link rel="icon" type="image/svg+xml" href="assets/bighub-icon.svg" />
+    <link rel="stylesheet" href="styles.css?v=brand-icon-1" />
   </head>
   <body>
     <section id="authView" class="auth-view">
       <div class="auth-card">
-        <div class="auth-brand"><div class="rail-logo">BH</div><div><strong>BigHub</strong><span>빅파일 사내 커뮤니케이션 허브</span></div></div>
+        <div class="auth-brand"><img class="brand-icon" src="assets/bighub-icon.svg" alt="BigHub" /><div><strong>BigHub</strong><span>빅파일 사내 커뮤니케이션 허브</span></div></div>
         <div class="auth-panel">
           <form id="loginForm" class="auth-form">
             <h1>로그인</h1>
@@ -50,7 +50,7 @@
 
     <div id="appShell" class="app-shell hidden">
       <aside class="rail expanded" aria-label="주요 메뉴">
-        <div class="rail-brand"><div class="rail-logo">BH</div><strong>BigHub</strong></div>
+        <div class="rail-brand"><img class="brand-icon small" src="assets/bighub-icon.svg" alt="BigHub" /><strong>BigHub</strong></div>
         <button class="rail-button active" data-view="feed" type="button"><span>⌂</span><strong>홈</strong></button>
         <button class="rail-button" data-view="search" type="button"><span>⌕</span><strong>검색</strong></button>
         <button class="rail-button" data-action="compose-focus" type="button"><span>＋</span><strong>글쓰기</strong></button>
@@ -86,7 +86,7 @@
           </section>
         </section>
         <aside class="side-panel">
-          <div class="profile-card"><div class="avatar current" id="currentAvatar">관</div><div><strong id="currentName">관리자</strong><span id="currentRole">admin</span></div><button id="logoutButton" class="mini-button" type="button">로그아웃</button></div>
+          <div class="profile-card"><div class="avatar current admin-icon" id="currentAvatar" aria-label="관리자"></div><div><strong id="currentName">관리자</strong><span id="currentRole">admin</span></div><button id="logoutButton" class="mini-button" type="button">로그아웃</button></div>
           <div id="approvalPanel" class="panel-block approvals hidden"><div class="panel-title"><strong>가입 승인</strong><span id="pendingCount">0</span></div><div id="pendingList" class="mini-list"></div></div>
           <div id="quickStats" class="panel-block stats"></div>
           <div class="panel-block calendar-panel"><div class="panel-title"><strong>일정</strong><span>마감</span></div><div id="calendarList" class="mini-list"></div></div>
@@ -120,6 +120,6 @@
     <script src="supabase-config.js?v=supabase-2"></script>
     <script src="app-state.js?v=supabase-2"></script>
     <script src="supabase-client.js?v=drive-api-6"></script>
-    <script src="app.js?v=sns-ui-1"></script>
+    <script src="app.js?v=brand-icon-1"></script>
   </body>
 </html>

@@ -22,7 +22,7 @@ function escapeHtml(value) { return String(value || "").replaceAll("&", "&amp;")
 function user(userId) { return state.users.find((item) => item.id === userId) || state.users[0]; }
 function userName(userId) { return user(userId).name; }
 function currentUser() { return state.users.find((item) => item.id === currentUserId) || null; }
-function avatarHtml(userId) { const item = user(userId); const admin = item.role === "admin" ? " admin" : ""; return `<div class="avatar${admin}">${escapeHtml(item.avatar || item.name.slice(0, 1))}</div>`; }
+function avatarHtml(userId) { const item = user(userId); return item.role === "admin" ? `<div class="avatar admin-icon" aria-label="관리자"></div>` : `<div class="avatar">${escapeHtml(item.avatar || item.name.slice(0, 1))}</div>`; }
 function linkHtml(url, label) { return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${label}</a>` : ""; }
 function emptyHtml() { return byId("emptyTemplate").innerHTML; }
 function setSession(userId, autoLogin) { const primary = autoLogin ? localStorage : sessionStorage; const secondary = autoLogin ? sessionStorage : localStorage; primary.setItem(sessionKey, userId); secondary.removeItem(sessionKey); if (autoLogin) localStorage.setItem(autoLoginKey, "1"); else localStorage.removeItem(autoLoginKey); }
@@ -284,7 +284,7 @@ function renderMissionTargets() {
   target.innerHTML = state.users.filter((item) => item.role === "member").map((item) => `<label><input type="checkbox" name="targetUserIds" value="${item.id}" checked /> ${escapeHtml(item.name)} · ${escapeHtml(item.department || "")}</label>`).join("");
 }
 
-function renderCurrentUser() { const item = currentUser(); byId("currentAvatar").textContent = item.avatar || item.name.slice(0, 1); byId("currentName").textContent = item.name; byId("currentRole").textContent = `${item.department} · ${item.role}`; }
+function renderCurrentUser() { const item = currentUser(); const avatar = byId("currentAvatar"); avatar.classList.toggle("admin-icon", item.role === "admin"); avatar.textContent = item.role === "admin" ? "" : item.avatar || item.name.slice(0, 1); avatar.setAttribute("aria-label", item.role === "admin" ? "관리자" : item.name); byId("currentName").textContent = item.name; byId("currentRole").textContent = `${item.department} · ${item.role}`; }
 
 function renderFeed() {
   document.querySelectorAll(".filter-chip").forEach((button) => button.classList.toggle("active", button.dataset.filter === postFilter));
