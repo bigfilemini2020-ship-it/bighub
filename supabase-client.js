@@ -24,7 +24,7 @@
     if (text.includes("permission denied") || text.includes("row-level security") || code === "42501") {
       if (fallback && fallback.includes("게시글")) return "게시글 저장 권한이 없습니다. Supabase SQL 업데이트를 다시 실행하세요.";
       if (fallback && fallback.includes("댓글")) return "댓글 저장 권한이 없습니다. Supabase SQL 업데이트를 다시 실행하세요.";
-      if (fallback && fallback.includes("반응")) return "좋아요/완료 저장 권한이 없습니다. Supabase SQL 업데이트를 다시 실행하세요.";
+      if (fallback && fallback.includes("반응")) return "완료 저장 권한이 없습니다. Supabase SQL 업데이트를 다시 실행하세요.";
       return "가입/로그인 정보 저장 권한이 없습니다. 관리자에게 Supabase SQL 업데이트를 요청하세요.";
     }
     if (code === "pgrst116" || text.includes("json object requested")) return "가입 신청 정보가 아직 생성되지 않았습니다. 관리자에게 Supabase SQL 업데이트를 요청하세요.";
@@ -95,7 +95,7 @@
   }
 
   function toComment(row) {
-    return { id: row.id, postId: row.post_id, userId: row.user_id, body: row.body, createdAt: row.created_at };
+    return { id: row.id, postId: row.post_id, userId: row.user_id, parentId: row.parent_id || "", body: row.body, createdAt: row.created_at };
   }
 
   function toDownload(row) {
@@ -221,10 +221,14 @@
   }
 
   async function addComment(input) {
-    const { error } = await client().from("comments").insert({ post_id: input.postId, user_id: input.userId, body: input.body });
+    const { error } = await client().from("comments").insert({ post_id: input.postId, user_id: input.userId, parent_id: input.parentId || null, body: input.body });
     if (error) throw new Error(userMessage(error, "댓글 저장에 실패했습니다."));
   }
 
+  async function deleteComment(id) {
+    const { error } = await client().from("comments").delete().eq("id", id);
+    if (error) throw new Error(userMessage(error, "댓글 삭제에 실패했습니다."));
+  }
   async function recordFileDownload(input) {
     const { error } = await client().from("mission_events").upsert({ post_id: input.postId, user_id: input.userId, event_type: "download" }, { onConflict: "post_id,user_id,event_type" });
     if (error) throw new Error(userMessage(error, "다운로드 기록에 실패했습니다."));
@@ -235,5 +239,5 @@
     if (error) throw new Error(userMessage(error, "가입 승인 처리에 실패했습니다."));
   }
 
-  root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, listContent, createPost, updatePost, addReaction, addComment, recordFileDownload, approveProfile, accessToken };
+  root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, listContent, createPost, updatePost, addReaction, addComment, deleteComment, recordFileDownload, approveProfile, accessToken };
 })(window);

@@ -1534,3 +1534,40 @@ textarea {
 .drive-attachment .mini-button {
   display: none;
 }
+.comment-main {
+  display: flex;
+  gap: 5px;
+  align-items: baseline;
+}
+
+.comment-tools {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.comment-tools button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  padding: 0;
+}
+
+.comment-tools button:hover {
+  color: var(--text);
+}
+
+.reply-list {
+  display: grid;
+  gap: 7px;
+  margin: 8px 0 0 18px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+}
+
+.reply-form {
+  margin-left: 18px;
+}

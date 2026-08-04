@@ -44,6 +44,7 @@ create table if not exists public.comments (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.posts(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
+  parent_id uuid references public.comments(id) on delete cascade,
   body text not null,
   created_at timestamptz not null default now()
 );
@@ -61,7 +62,7 @@ create table if not exists public.mission_events (
   id uuid primary key default gen_random_uuid(),
   post_id uuid not null references public.posts(id) on delete cascade,
   user_id uuid not null references public.profiles(id) on delete cascade,
-  event_type text not null check (event_type in ('download', 'done', 'comment')),
+  event_type text not null check (event_type in ('download', 'done')),
   created_at timestamptz not null default now(),
   unique (post_id, user_id, event_type)
 );
@@ -75,6 +76,7 @@ alter table public.mission_events enable row level security;
 alter table public.posts add column if not exists attachment_name text not null default '';
 alter table public.posts add column if not exists attachment_mime_type text not null default '';
 alter table public.posts add column if not exists updated_at timestamptz;
+alter table public.comments add column if not exists parent_id uuid references public.comments(id) on delete cascade;
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.profiles to authenticated;
 grant select, insert, update, delete on public.posts to authenticated;
@@ -197,6 +199,8 @@ create policy "approved select comments" on public.comments for select to authen
 
 drop policy if exists "approved insert comments" on public.comments;
 create policy "approved insert comments" on public.comments for insert to authenticated with check (public.is_approved() and user_id = auth.uid());
+drop policy if exists "own or admin delete comments" on public.comments;
+create policy "own or admin delete comments" on public.comments for delete to authenticated using (user_id = auth.uid() or public.is_admin());
 
 drop policy if exists "approved select reactions" on public.reactions;
 create policy "approved select reactions" on public.reactions for select to authenticated using (public.is_approved());

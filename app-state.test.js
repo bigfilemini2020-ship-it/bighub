@@ -7,6 +7,7 @@ const {
   updatePost,
   addReaction,
   addComment,
+  deleteComment,
   getPostCompletion,
   getLinkPreview,
   getPostPresentation,
@@ -131,7 +132,7 @@ test("like reaction does not mark a post complete", () => {
   assert.deepEqual(completion.completedUserIds, []);
 });
 
-test("comment marks a mission complete for the commenting user", () => {
+test("comment does not mark a mission complete", () => {
   let state = createInitialState(now);
   state = addPost(state, {
     type: "mission",
@@ -146,9 +147,30 @@ test("comment marks a mission complete for the commenting user", () => {
   const completion = getPostCompletion(state, postId);
 
   assert.equal(state.comments.length, 1);
-  assert.deepEqual(completion.completedUserIds, ["u-2"]);
+  assert.deepEqual(completion.completedUserIds, []);
 });
 
+test("comments can have replies and delete removes the thread", () => {
+  let state = createInitialState(now);
+  state = addPost(state, {
+    type: "notice",
+    title: "Guide",
+    body: "Read this",
+    authorId: "u-admin",
+  }, now);
+
+  const postId = state.posts[0].id;
+  state = addComment(state, { postId, userId: "u-1", body: "Question" }, now);
+  const parentId = state.comments[0].id;
+  state = addComment(state, { postId, userId: "u-admin", parentId, body: "Answer" }, now);
+
+  assert.equal(state.comments.length, 2);
+  assert.equal(state.comments[0].parentId, parentId);
+
+  state = deleteComment(state, parentId);
+
+  assert.equal(state.comments.length, 0);
+});
 test("question posts can include attachments and receive answer comments", () => {
   let state = createInitialState(now);
   state = addPost(state, {

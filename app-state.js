@@ -124,11 +124,17 @@
       postId: input.postId,
       userId: input.userId,
       body: trim(input.body),
+      parentId: input.parentId || "",
       createdAt: now,
     };
     return { ...state, comments: [comment, ...state.comments] };
   }
 
+  function deleteComment(state, commentId) {
+    const childIds = new Set(state.comments.filter((comment) => comment.parentId === commentId).map((comment) => comment.id));
+    childIds.add(commentId);
+    return { ...state, comments: state.comments.filter((comment) => !childIds.has(comment.id)) };
+  }
   function addResource(state, input, now = new Date().toISOString()) {
     const resource = {
       id: nextId("resource", state.resources),
@@ -249,7 +255,7 @@
   function getPostCompletion(state, postId) {
     const post = state.posts.find((item) => item.id === postId) || {};
     const targets = post.targetUserIds && post.targetUserIds.length ? post.targetUserIds : memberIds;
-    const rules = post.type === "mission" && post.completionRules && post.completionRules.length ? post.completionRules : ["doneOrComment"];
+    const rules = post.type === "mission" && post.completionRules && post.completionRules.length ? post.completionRules : ["done"];
     const completedUserIds = targets.filter((userId) => rules.every((rule) => hasCheckpoint(state, postId, userId, rule))).sort();
     return {
       postId,
@@ -263,8 +269,6 @@
   function hasCheckpoint(state, postId, userId, rule) {
     if (rule === "download") return (state.downloads || []).some((download) => download.postId === postId && download.userId === userId);
     if (rule === "done") return state.reactions.some((reaction) => reaction.postId === postId && reaction.userId === userId && reaction.sticker === "done");
-    if (rule === "comment") return state.comments.some((comment) => comment.postId === postId && comment.userId === userId);
-    if (rule === "doneOrComment") return hasCheckpoint(state, postId, userId, "done") || hasCheckpoint(state, postId, userId, "comment");
     return false;
   }
 
@@ -311,6 +315,7 @@
     updatePost,
     addReaction,
     addComment,
+    deleteComment,
     recordFileDownload,
     addResource,
     addQuestion,

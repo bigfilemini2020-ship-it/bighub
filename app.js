@@ -529,7 +529,6 @@ function postCardHtml(post) {
   const reactions = state.reactions.filter((reaction) => reaction.postId === post.id);
   const comments = state.comments.filter((comment) => comment.postId === post.id);
   const mine = reactions.filter((reaction) => reaction.userId === currentUserId);
-  const likeCount = reactions.filter((reaction) => reaction.sticker === "like").length;
   const doneCount = reactions.filter((reaction) => reaction.sticker === "done").length;
   const mediaUrl = post.mediaUrl || post.videoUrl || post.attachmentUrl;
   const presentation = S.getPostPresentation(post);
@@ -537,7 +536,7 @@ function postCardHtml(post) {
   const preview = presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post) : "";
   const editButton = canEditPost(post) ? `<button class="post-edit-button" data-action="edit-post" data-post-id="${post.id}" type="button">수정</button>` : "";
   const doneLabel = post.type === "mission" ? `완료 ${doneCount}/${completion.totalMembers}` : `완료 ${doneCount}`;
-  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${editButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<div class="feed-actions">${actionButton(post.id, "like", mine, "heart", `좋아요 ${likeCount}`)}${actionButton(post.id, "done", mine, "check", doneLabel)}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글 ${comments.length}</span></button>${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${comments.map(commentHtml).join("")}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요. 댓글도 완료로 기록됩니다." required /><button type="submit">게시</button></form></section></article>`;
+  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${editButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<div class="feed-actions">${actionButton(post.id, "done", mine, "check", doneLabel)}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글 ${comments.length}</span></button>${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form></section></article>`;
 }
 
 function actionButton(postId, sticker, mine, icon, label) { const active = mine.some((reaction) => reaction.sticker === sticker) ? " active" : ""; return `<button class="icon-action ${sticker}${active}" data-action="reaction" data-post-id="${postId}" data-sticker="${sticker}" type="button" title="${label}" aria-label="${label}">${iconSvg(icon)}<span>${label}</span></button>`; }
@@ -563,7 +562,18 @@ async function hydrateDriveVideos() {
     video.src = `${video.dataset.driveSrc}${separator}token=${encodeURIComponent(token)}`;
   });
 }
-function commentHtml(comment) { return `<div class="comment"><strong>${escapeHtml(userName(comment.userId))}</strong>${escapeHtml(comment.body)}</div>`; }
+function commentsHtml(postId, comments) {
+  const roots = comments.filter((comment) => !comment.parentId);
+  return roots.map((comment) => commentHtml(comment, comments.filter((reply) => reply.parentId === comment.id))).join("");
+}
+function commentHtml(comment, replies = []) {
+  const canDelete = currentUser()?.role === "admin" || comment.userId === currentUserId;
+  return `<div class="comment" id="comment-${comment.id}"><div class="comment-main"><strong>${escapeHtml(userName(comment.userId))}</strong><span>${escapeHtml(comment.body)}</span></div><div class="comment-tools"><button data-focus-reply="${comment.id}" type="button">답글</button>${canDelete ? `<button data-action="delete-comment" data-comment-id="${comment.id}" type="button">삭제</button>` : ""}</div>${replies.length ? `<div class="reply-list">${replies.map((reply) => replyHtml(reply)).join("")}</div>` : ""}<form class="inline-form reply-form hidden" data-action="comment" data-post-id="${comment.postId}" data-parent-id="${comment.id}"><input name="body" placeholder="답글을 입력하세요." required /><button type="submit">게시</button></form></div>`;
+}
+function replyHtml(comment) {
+  const canDelete = currentUser()?.role === "admin" || comment.userId === currentUserId;
+  return `<div class="comment reply" id="comment-${comment.id}"><div class="comment-main"><strong>${escapeHtml(userName(comment.userId))}</strong><span>${escapeHtml(comment.body)}</span></div>${canDelete ? `<div class="comment-tools"><button data-action="delete-comment" data-comment-id="${comment.id}" type="button">삭제</button></div>` : ""}</div>`;
+}
 function dateText(post) { if (post.startDate && post.dueDate) return ` · ${post.startDate} ~ ${post.dueDate}`; if (post.dueDate) return ` · ${post.dueDate} 마감`; if (post.startDate) return ` · ${post.startDate} 시작`; return ""; }
 
 function renderSearch() { const input = byId("globalSearch"); if (!input) return; const query = input.value.trim().toLowerCase(); if (!query) { byId("searchResults").innerHTML = `<div class="empty">검색어를 입력하세요.</div>`; return; } const results = state.posts.filter((post) => `${post.title} ${post.body} ${postTypeLabel(post.type)}`.toLowerCase().includes(query)).map((post) => resultCard(postTypeLabel(post.type), post.title, post.body)); byId("searchResults").innerHTML = results.length ? results.join("") : emptyHtml(); }
@@ -578,6 +588,8 @@ function formatDate(value) { const date = new Date(value); return Number.isNaN(d
 document.addEventListener("click", async (event) => {
   const focusTarget = event.target.closest("[data-focus-comment]");
   if (focusTarget) { const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
+  const replyTarget = event.target.closest("[data-focus-reply]");
+  if (replyTarget) { const form = replyTarget.closest(".comment")?.querySelector(".reply-form"); if (form) { form.classList.toggle("hidden"); form.querySelector("input")?.focus(); } return; }
   const target = event.target.closest("[data-action]");
   if (!target || target.tagName === "FORM") return;
   if (target.dataset.action === "edit-post") { openEditModal(target.dataset.postId); return; }
@@ -606,6 +618,18 @@ document.addEventListener("click", async (event) => {
     render();
     return;
   }
+  if (target.dataset.action === "delete-comment") {
+    const commentId = target.dataset.commentId;
+    if (remoteAuth()) {
+      try { await window.BigHubSupabase.deleteComment(commentId); await refreshRemoteData(); }
+      catch (error) { alert(error.message || "댓글 삭제에 실패했습니다."); return; }
+    } else {
+      state = S.deleteComment(state, commentId);
+      saveState();
+    }
+    render();
+    return;
+  }
   if (target.dataset.action === "approve-signup") { if (remoteAuth()) { window.BigHubSupabase.approveProfile(target.dataset.requestId).then(refreshRemoteData).then(render); return; } state = S.approveSignupRequest(state, target.dataset.requestId); }
   saveState();
   render();
@@ -618,10 +642,10 @@ document.addEventListener("submit", async (event) => {
   const data = Object.fromEntries(new FormData(form));
   if (form.dataset.action === "comment") {
     if (remoteAuth()) {
-      try { await window.BigHubSupabase.addComment({ ...data, postId: form.dataset.postId, userId: currentUserId }); await refreshRemoteData(); }
+      try { await window.BigHubSupabase.addComment({ ...data, postId: form.dataset.postId, parentId: form.dataset.parentId || "", userId: currentUserId }); await refreshRemoteData(); }
       catch (error) { alert(error.message || "댓글 저장에 실패했습니다."); return; }
     } else {
-      state = S.addComment(state, { ...data, postId: form.dataset.postId, userId: currentUserId });
+      state = S.addComment(state, { ...data, postId: form.dataset.postId, parentId: form.dataset.parentId || "", userId: currentUserId });
       saveState();
     }
   }
