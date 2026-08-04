@@ -1,0 +1,153 @@
+﻿const storeKey = "ai-education-feed-state-v3";
+const S = window.EducationState;
+
+let state = loadState();
+let currentUserId = state.users[0].id;
+let activeView = "feed";
+let postFilter = "all";
+
+function loadState() {
+  const saved = localStorage.getItem(storeKey);
+  if (saved) return JSON.parse(saved);
+  let initial = S.createInitialState();
+  initial = S.addPost(initial, { type: "notice", title: "1주차 AI 교육 안내", body: "영상 또는 HTML 자료를 보고 댓글을 남기거나 완료 버튼을 눌러주세요.", authorId: "u-admin", mediaUrl: "https://youtu.be/abc123", attachmentUrl: "https://drive.google.com/" });
+  initial = S.addPost(initial, { type: "mission", title: "프롬프트 실습", body: "업무 자동화에 쓸 수 있는 프롬프트 예시를 확인하고 적용 아이디어를 댓글로 남겨주세요.", authorId: "u-admin", mediaUrl: "https://example.com/course.html" });
+  initial = S.addPost(initial, { type: "question", title: "파일 첨부 질문", body: "오류 화면 캡처를 첨부해서 질문하는 예시입니다.", authorId: "u-1", attachmentUrl: "https://example.com/error.png" });
+  initial = S.addPost(initial, { type: "general", title: "오늘 교육 메모", body: "텍스트 공지는 이미지 없이도 빠르게 읽히는 스레드형 카드로 표시됩니다.", authorId: "u-admin" });
+  return initial;
+}
+
+function saveState() { localStorage.setItem(storeKey, JSON.stringify(state)); }
+function byId(id) { return document.getElementById(id); }
+function escapeHtml(value) { return String(value || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
+function user(userId) { return state.users.find((item) => item.id === userId) || state.users[0]; }
+function userName(userId) { return user(userId).name; }
+function avatarHtml(userId) { const item = user(userId); const admin = item.role === "admin" ? " admin" : ""; return `<div class="avatar${admin}">${escapeHtml(item.avatar || item.name.slice(0, 1))}</div>`; }
+function linkHtml(url, label) { return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${label}</a>` : ""; }
+function emptyHtml() { return byId("emptyTemplate").innerHTML; }
+function postTypeLabel(type) { return { general: "일반", notice: "공지", mission: "미션", question: "질문" }[type] || "일반"; }
+
+function init() { renderUserSelects(); bindNavigation(); bindForms(); render(); }
+
+function renderUserSelects() {
+  [byId("currentUser"), byId("currentUserMobile")].forEach((select) => {
+    select.innerHTML = state.users.map((item) => `<option value="${item.id}">${escapeHtml(item.name)} · ${item.role}</option>`).join("");
+    select.value = currentUserId;
+    select.onchange = () => { currentUserId = select.value; renderUserSelects(); render(); };
+  });
+}
+
+function bindNavigation() {
+  document.querySelectorAll(".rail-button[data-view]").forEach((button) => {
+    button.addEventListener("click", () => { activeView = button.dataset.view; render(); });
+  });
+  document.querySelector("[data-action='compose-focus']").addEventListener("click", openComposeModal);
+  document.querySelectorAll("[data-action='close-compose']").forEach((item) => item.addEventListener("click", closeComposeModal));
+  document.querySelectorAll(".filter-chip").forEach((button) => {
+    button.addEventListener("click", () => { postFilter = button.dataset.filter; renderFeed(); });
+  });
+  byId("globalSearch").addEventListener("input", renderSearch);
+  byId("resetDemo").addEventListener("click", () => { localStorage.removeItem(storeKey); state = loadState(); currentUserId = state.users[0].id; renderUserSelects(); render(); });
+}
+
+function openComposeModal() { byId("composeModal").classList.remove("hidden"); byId("postForm").querySelector("input[name='title']").focus(); }
+function closeComposeModal() { byId("composeModal").classList.add("hidden"); }
+
+function bindForms() {
+  byId("postForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    state = S.addPost(state, { ...data, authorId: currentUserId });
+    saveState();
+    event.currentTarget.reset();
+    closeComposeModal();
+    activeView = "feed";
+    render();
+  });
+}
+
+function render() {
+  document.querySelectorAll(".rail-button[data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === activeView));
+  document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
+  byId(`${activeView}View`).classList.add("active");
+  renderCurrentUser(); renderFeed(); renderSearch(); renderProgress(); renderStats();
+}
+
+function renderCurrentUser() { const item = user(currentUserId); byId("currentAvatar").textContent = item.avatar || item.name.slice(0, 1); byId("currentName").textContent = item.name; byId("currentRole").textContent = item.role; }
+
+function renderFeed() {
+  document.querySelectorAll(".filter-chip").forEach((button) => button.classList.toggle("active", button.dataset.filter === postFilter));
+  const posts = state.posts.filter((post) => postFilter === "all" || post.type === postFilter);
+  byId("postList").innerHTML = posts.length ? posts.map(postCardHtml).join("") : emptyHtml();
+}
+
+function postCardHtml(post) {
+  const completion = S.getPostCompletion(state, post.id);
+  const reactions = state.reactions.filter((reaction) => reaction.postId === post.id);
+  const comments = state.comments.filter((comment) => comment.postId === post.id);
+  const mine = reactions.filter((reaction) => reaction.userId === currentUserId);
+  const likeCount = reactions.filter((reaction) => reaction.sticker === "like").length;
+  const doneCount = reactions.filter((reaction) => reaction.sticker === "done").length;
+  const mediaUrl = post.mediaUrl || post.videoUrl || post.attachmentUrl;
+  const presentation = S.getPostPresentation(post);
+  const cardClass = presentation.kind === "text" ? "feed-card text-card" : "feed-card media-card";
+  return `<article class="${cardClass}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}</span></div></div><span class="post-type">${postTypeLabel(post.type)}</span></header>${presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post.title) : ""}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p>${escapeHtml(post.body)}</p>${post.attachmentUrl ? `<div class="attachment-line">${linkHtml(post.attachmentUrl, "첨부파일 열기")}</div>` : ""}<p class="feed-counts">좋아요 ${likeCount} · 완료 ${doneCount}/${completion.totalMembers} · 댓글 ${comments.length}</p><div class="feed-actions">${actionButton(post.id, "like", mine, "heart", "좋아요")}${actionButton(post.id, "done", mine, "check", "완료")}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글</span></button>${post.attachmentUrl ? `<a class="save-link" href="${escapeHtml(post.attachmentUrl)}" target="_blank" rel="noreferrer" title="저장/열기">⇩</a>` : ""}</div>${comments.length ? `<div class="comment-list">${comments.map(commentHtml).join("")}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요. 댓글도 완료로 기록됩니다." required /><button type="submit">게시</button></form></section></article>`;
+}
+
+function actionButton(postId, sticker, mine, icon, label) {
+  const active = mine.some((reaction) => reaction.sticker === sticker) ? " active" : "";
+  return `<button class="icon-action ${sticker}${active}" data-action="reaction" data-post-id="${postId}" data-sticker="${sticker}" type="button" title="${label}" aria-label="${label}">${iconSvg(icon)}<span>${label}</span></button>`;
+}
+
+function iconSvg(name) {
+  const icons = {
+    heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.2-4.4-9.5-9.1C.7 8.2 2.9 4.5 6.7 4.5c2 0 3.7 1.1 4.7 2.7 1-1.6 2.7-2.7 4.7-2.7 3.8 0 6 3.7 4.2 7.4C19.2 16.6 12 21 12 21Z"/></svg>`,
+    check: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`,
+    comment: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.4 9.6 9.6 0 0 1-4-.8L3 20l1.1-4.4A8.1 8.1 0 0 1 3 11.5C3 6.8 7 3 12 3s9 3.8 9 8.5Z"/></svg>`,
+  };
+  return icons[name] || name;
+}
+function mediaPreviewHtml(url, title) { const preview = S.getLinkPreview(url); if (preview.type === "youtube") return `<a class="media-preview" href="${escapeHtml(url)}" target="_blank" rel="noreferrer"><img src="${escapeHtml(preview.thumbnailUrl)}" alt="${escapeHtml(title)} 썸네일" /></a>`; if (preview.type === "image") return `<a class="media-preview" href="${escapeHtml(url)}" target="_blank" rel="noreferrer"><img src="${escapeHtml(url)}" alt="${escapeHtml(title)}" /></a>`; const label = preview.type === "html" ? "HTML" : "LINK"; return `<a class="media-preview" href="${escapeHtml(url)}" target="_blank" rel="noreferrer"><div class="file-preview"><div class="file-icon">${label}</div><strong>${escapeHtml(title)}</strong><span>열어서 보기</span></div></a>`; }
+function commentHtml(comment) { return `<div class="comment"><strong>${escapeHtml(userName(comment.userId))}</strong>${escapeHtml(comment.body)}</div>`; }
+
+function renderSearch() {
+  const input = byId("globalSearch"); if (!input) return;
+  const query = input.value.trim().toLowerCase();
+  if (!query) { byId("searchResults").innerHTML = `<div class="empty">검색어를 입력하세요.</div>`; return; }
+  const results = state.posts.filter((post) => `${post.title} ${post.body} ${postTypeLabel(post.type)}`.toLowerCase().includes(query)).map((post) => resultCard(postTypeLabel(post.type), post.title, post.body));
+  byId("searchResults").innerHTML = results.length ? results.join("") : emptyHtml();
+}
+function resultCard(type, title, body) { return `<article class="resource-card result-card"><span class="status-pill">${escapeHtml(type)}</span><h3>${escapeHtml(title)}</h3><p>${escapeHtml(body)}</p></article>`; }
+
+function renderProgress() {
+  const members = state.users.filter((item) => item.role === "member");
+  const posts = state.posts.filter((post) => post.type === "notice" || post.type === "mission");
+  byId("userProgress").innerHTML = members.map((item) => { const done = posts.filter((post) => S.getPostCompletion(state, post.id).completedUserIds.includes(item.id)).length; const percent = posts.length ? Math.round((done / posts.length) * 100) : 0; return progressCard(item.name, `${done}/${posts.length}개 완료`, percent); }).join("") || emptyHtml();
+  byId("postProgress").innerHTML = posts.map((post) => { const completion = S.getPostCompletion(state, post.id); return progressCard(post.title, `${completion.completedCount}/${completion.totalMembers}명 완료`, completion.percent); }).join("") || emptyHtml();
+}
+function progressCard(title, meta, percent) { return `<article class="progress-card"><h3>${escapeHtml(title)}</h3><span class="feed-meta">${escapeHtml(meta)} · ${percent}%</span><div class="bar" aria-hidden="true"><span style="width: ${percent}%"></span></div></article>`; }
+function renderStats() { const questionCount = state.posts.filter((post) => post.type === "question").length; byId("quickStats").innerHTML = `<div class="stat-row"><span>게시물</span><strong>${state.posts.length}</strong></div><div class="stat-row"><span>질문</span><strong>${questionCount}</strong></div>`; }
+function formatDate(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "방금" : `${date.getMonth() + 1}.${date.getDate()}`; }
+
+document.addEventListener("click", (event) => {
+  const focusTarget = event.target.closest("[data-focus-comment]");
+  if (focusTarget) { const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
+  const target = event.target.closest("[data-action]");
+  if (!target || target.tagName === "FORM") return;
+  if (target.dataset.action === "reaction") state = S.addReaction(state, { postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker });
+  saveState(); render();
+});
+
+document.addEventListener("submit", (event) => {
+  const form = event.target.closest("[data-action]");
+  if (!form) return;
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(form));
+  if (form.dataset.action === "comment") state = S.addComment(state, { ...data, postId: form.dataset.postId, userId: currentUserId });
+  saveState(); form.reset(); render();
+});
+
+init();
+
+
+
