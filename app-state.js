@@ -1,4 +1,4 @@
-﻿(function (root, factory) {
+(function (root, factory) {
   if (typeof module === "object" && module.exports) {
     module.exports = factory();
   } else {
@@ -7,15 +7,16 @@
 })(typeof self !== "undefined" ? self : this, function () {
   const memberIds = ["u-1", "u-2", "u-3", "u-4"];
   const departments = ["임원", "경영지원", "개발", "운영", "마케팅", "기타"];
+  const authEmailDomain = "bighub.local";
 
   function createInitialState(now = new Date().toISOString()) {
     return {
       users: [
-        { id: "u-admin", name: "관리자", department: "임원", role: "admin", avatar: "관", password: "admin1234", approvedAt: now },
-        { id: "u-1", name: "김민지", department: "개발", role: "member", avatar: "민", password: "pass1234", approvedAt: now },
-        { id: "u-2", name: "박준호", department: "운영", role: "member", avatar: "준", password: "pass1234", approvedAt: now },
-        { id: "u-3", name: "이서연", department: "마케팅", role: "member", avatar: "서", password: "pass1234", approvedAt: now },
-        { id: "u-4", name: "최현우", department: "경영지원", role: "member", avatar: "현", password: "pass1234", approvedAt: now },
+        { id: "u-admin", loginId: "admin", authEmail: "admin@bighub.local", name: "관리자", department: "임원", role: "admin", avatar: "관", password: "admin1234", approvedAt: now },
+        { id: "u-1", loginId: "minji", authEmail: "minji@bighub.local", name: "김민지", department: "개발", role: "member", avatar: "민", password: "pass1234", approvedAt: now },
+        { id: "u-2", loginId: "junho", authEmail: "junho@bighub.local", name: "박준호", department: "운영", role: "member", avatar: "준", password: "pass1234", approvedAt: now },
+        { id: "u-3", loginId: "seoyeon", authEmail: "seoyeon@bighub.local", name: "이서연", department: "마케팅", role: "member", avatar: "서", password: "pass1234", approvedAt: now },
+        { id: "u-4", loginId: "hyunwoo", authEmail: "hyunwoo@bighub.local", name: "최현우", department: "경영지원", role: "member", avatar: "현", password: "pass1234", approvedAt: now },
       ],
       posts: [],
       reactions: [],
@@ -35,6 +36,16 @@
 
   function trim(value) {
     return String(value || "").trim();
+  }
+
+  function validateLoginId(value) {
+    const loginId = trim(value).toLowerCase();
+    if (!/^[a-z0-9._-]{3,32}$/.test(loginId)) throw new Error("login id is invalid");
+    return loginId;
+  }
+
+  function loginIdToAuthEmail(value) {
+    return `${validateLoginId(value)}@${authEmailDomain}`;
   }
 
   function normalizeList(value) {
@@ -151,6 +162,7 @@
   }
 
   function createSignupRequest(state, input, now = new Date().toISOString()) {
+    const loginId = validateLoginId(input.loginId);
     const name = trim(input.name);
     const department = trim(input.department);
     const password = trim(input.password);
@@ -159,11 +171,16 @@
     if (!departments.includes(department)) throw new Error("department is invalid");
     if (password.length < 6) throw new Error("password is too short");
     if (password !== passwordConfirm) throw new Error("password confirmation does not match");
+    const authEmail = loginIdToAuthEmail(loginId);
+    const loginIdTaken = state.users.some((user) => user.loginId === loginId || user.authEmail === authEmail) || state.signupRequests.some((request) => request.loginId === loginId && request.status === "pending");
+    if (loginIdTaken) throw new Error("login id already exists");
     if (state.users.some((user) => user.name === name) || state.signupRequests.some((request) => request.name === name && request.status === "pending")) {
       throw new Error("name already exists");
     }
     const request = {
       id: nextId("signup", state.signupRequests || []),
+      loginId,
+      authEmail,
       name,
       department,
       password,
@@ -178,6 +195,8 @@
     if (!request || request.status !== "pending") return state;
     const user = {
       id: `u-${state.users.length}`,
+      loginId: request.loginId,
+      authEmail: request.authEmail,
       name: request.name,
       department: request.department,
       role: "member",
@@ -193,9 +212,10 @@
   }
 
   function authenticateUser(state, input) {
+    const loginId = input.loginId ? validateLoginId(input.loginId) : "";
     const name = trim(input.name);
     const password = trim(input.password);
-    const user = state.users.find((item) => item.name === name && item.password === password && item.approvedAt);
+    const user = state.users.find((item) => (loginId ? item.loginId === loginId : item.name === name) && item.password === password && item.approvedAt);
     return user ? { ...user, password: undefined } : null;
   }
 
@@ -274,6 +294,8 @@
     createSignupRequest,
     approveSignupRequest,
     authenticateUser,
+    loginIdToAuthEmail,
+    validateLoginId,
     departments,
   };
 });

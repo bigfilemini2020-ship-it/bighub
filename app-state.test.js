@@ -1,4 +1,4 @@
-﻿const test = require("node:test");
+const test = require("node:test");
 const assert = require("node:assert/strict");
 
 const {
@@ -13,6 +13,8 @@ const {
   createSignupRequest,
   approveSignupRequest,
   authenticateUser,
+  loginIdToAuthEmail,
+  validateLoginId,
 } = require("./app-state");
 
 const now = "2026-08-04T09:00:00.000Z";
@@ -151,6 +153,7 @@ test("signup request waits for admin approval before login", () => {
   let state = createInitialState(now);
   state = createSignupRequest(state, {
     name: "홍길동",
+    loginId: "hong",
     department: "개발",
     password: "pass1234",
     passwordConfirm: "pass1234",
@@ -158,6 +161,8 @@ test("signup request waits for admin approval before login", () => {
 
   assert.equal(state.signupRequests.length, 1);
   assert.equal(state.signupRequests[0].status, "pending");
+  assert.equal(state.signupRequests[0].loginId, "hong");
+  assert.equal(state.signupRequests[0].authEmail, "hong@bighub.local");
   assert.equal(authenticateUser(state, { name: "홍길동", password: "pass1234" }), null);
 
   state = approveSignupRequest(state, state.signupRequests[0].id, now);
@@ -173,6 +178,7 @@ test("signup validates department and matching password", () => {
 
   assert.throws(() => createSignupRequest(state, {
     name: "홍길동",
+    loginId: "hong2",
     department: "없는부서",
     password: "pass1234",
     passwordConfirm: "pass1234",
@@ -180,10 +186,18 @@ test("signup validates department and matching password", () => {
 
   assert.throws(() => createSignupRequest(state, {
     name: "홍길동",
+    loginId: "hong3",
     department: "개발",
     password: "pass1234",
     passwordConfirm: "different",
   }, now), /password/);
+});
+
+test("login id maps to internal auth email", () => {
+  assert.equal(validateLoginId("kim_01"), "kim_01");
+  assert.equal(loginIdToAuthEmail(" Kim_01 "), "kim_01@bighub.local");
+  assert.throws(() => validateLoginId("김민수"), /login id/);
+  assert.throws(() => validateLoginId("ab"), /login id/);
 });
 
 test("mission completion can require selected people and multiple checkpoints", () => {

@@ -1,4 +1,4 @@
-﻿const storeKey = "bighub-state-v4";
+const storeKey = "bighub-state-v4";
 const sessionKey = "bighub-session-v1";
 const S = window.EducationState;
 
@@ -19,6 +19,7 @@ function loadState() {
 }
 
 function saveState() { localStorage.setItem(storeKey, JSON.stringify(state)); }
+function remoteAuth() { return window.BigHubSupabase && window.BigHubSupabase.isConfigured(); }
 function byId(id) { return document.getElementById(id); }
 function escapeHtml(value) { return String(value || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
 function user(userId) { return state.users.find((item) => item.id === userId) || state.users[0]; }
@@ -29,27 +30,60 @@ function linkHtml(url, label) { return url ? `<a href="${escapeHtml(url)}" targe
 function emptyHtml() { return byId("emptyTemplate").innerHTML; }
 function postTypeLabel(type) { return { general: "일반", notice: "공지", mission: "미션", question: "질문" }[type] || "일반"; }
 
-function init() { bindAuthForms(); bindNavigation(); bindForms(); render(); }
+async function init() {
+  bindAuthForms();
+  bindNavigation();
+  bindForms();
+  if (remoteAuth()) await restoreRemoteSession();
+  render();
+}
+
+async function restoreRemoteSession() {
+  try {
+    const profile = await window.BigHubSupabase.currentProfile();
+    if (!profile) return;
+    currentUserId = profile.id;
+    await refreshRemoteUsers();
+  } catch (error) {
+    console.warn(error);
+  }
+}
+
+async function refreshRemoteUsers() {
+  if (!remoteAuth()) return;
+  const users = await window.BigHubSupabase.listProfiles();
+  state = { ...state, users };
+}
 
 function bindAuthForms() {
-  byId("loginForm").addEventListener("submit", (event) => {
-    event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget));
-    const user = S.authenticateUser(state, data);
-    if (!user) { byId("loginMessage").textContent = "승인된 계정이 없거나 비밀번호가 맞지 않습니다."; return; }
-    currentUserId = user.id;
-    localStorage.setItem(sessionKey, currentUserId);
-    byId("loginMessage").textContent = "";
-    render();
-  });
-  byId("signupForm").addEventListener("submit", (event) => {
+  byId("loginForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      state = S.createSignupRequest(state, data);
-      saveState();
+      const user = remoteAuth() ? await window.BigHubSupabase.signIn(data) : S.authenticateUser(state, data);
+      if (!user) { byId("loginMessage").textContent = "승인된 계정이 없거나 비밀번호가 맞지 않습니다."; return; }
+      currentUserId = user.id;
+      localStorage.setItem(sessionKey, currentUserId);
+      if (remoteAuth()) await refreshRemoteUsers();
+      byId("loginMessage").textContent = "";
+      render();
+    } catch (error) {
+      byId("loginMessage").textContent = error.message || "로그인에 실패했습니다.";
+    }
+  });
+  byId("signupForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    try {
+      if (remoteAuth()) {
+        await window.BigHubSupabase.signUp(data);
+      } else {
+        state = S.createSignupRequest(state, data);
+        saveState();
+      }
       event.currentTarget.reset();
       byId("signupMessage").textContent = "가입 신청이 접수됐습니다. 관리자 승인 후 로그인할 수 있습니다.";
+      if (remoteAuth()) await refreshRemoteUsers();
       render();
     } catch (error) {
       byId("signupMessage").textContent = error.message;
@@ -63,7 +97,7 @@ function bindNavigation() {
   document.querySelectorAll("[data-action='close-compose']").forEach((item) => item.addEventListener("click", closeComposeModal));
   document.querySelectorAll(".filter-chip").forEach((button) => button.addEventListener("click", () => { postFilter = button.dataset.filter; renderFeed(); }));
   byId("globalSearch").addEventListener("input", renderSearch);
-  byId("logoutButton").addEventListener("click", () => { currentUserId = ""; localStorage.removeItem(sessionKey); render(); });
+  byId("logoutButton").addEventListener("click", async () => { if (remoteAuth()) await window.BigHubSupabase.signOut(); currentUserId = ""; localStorage.removeItem(sessionKey); render(); });
   byId("resetDemo").addEventListener("click", () => { localStorage.removeItem(storeKey); localStorage.removeItem(sessionKey); state = loadState(); currentUserId = ""; render(); });
 }
 
@@ -136,12 +170,12 @@ function resultCard(type, title, body) { return `<article class="resource-card r
 function renderProgress() { const members = state.users.filter((item) => item.role === "member"); const posts = state.posts.filter((post) => post.type === "notice" || post.type === "mission"); byId("userProgress").innerHTML = members.map((item) => { const done = posts.filter((post) => S.getPostCompletion(state, post.id).completedUserIds.includes(item.id)).length; const percent = posts.length ? Math.round((done / posts.length) * 100) : 0; return progressCard(item.name, `${done}/${posts.length}개 완료`, percent); }).join("") || emptyHtml(); byId("postProgress").innerHTML = posts.map((post) => { const completion = S.getPostCompletion(state, post.id); return progressCard(post.title, `${completion.completedCount}/${completion.totalMembers}명 완료`, completion.percent); }).join("") || emptyHtml(); }
 function progressCard(title, meta, percent) { return `<article class="progress-card"><h3>${escapeHtml(title)}</h3><span class="feed-meta">${escapeHtml(meta)} · ${percent}%</span><div class="bar" aria-hidden="true"><span style="width: ${percent}%"></span></div></article>`; }
 function renderStats() { const questionCount = state.posts.filter((post) => post.type === "question").length; byId("quickStats").innerHTML = `<div class="stat-row"><span>게시물</span><strong>${state.posts.length}</strong></div><div class="stat-row"><span>질문</span><strong>${questionCount}</strong></div>`; }
-function renderApprovals() { const panel = byId("approvalPanel"); const pending = (state.signupRequests || []).filter((request) => request.status === "pending"); panel.classList.toggle("hidden", currentUser()?.role !== "admin"); byId("pendingCount").textContent = pending.length; byId("pendingList").innerHTML = pending.length ? pending.map((request) => `<div class="mini-item"><div><strong>${escapeHtml(request.name)}</strong><span>${escapeHtml(request.department)}</span></div><button class="mini-button" data-action="approve-signup" data-request-id="${request.id}" type="button">승인</button></div>`).join("") : `<div class="mini-empty">대기 중인 신청 없음</div>`; }
+function renderApprovals() { const panel = byId("approvalPanel"); const pending = remoteAuth() ? state.users.filter((user) => user.status === "pending") : (state.signupRequests || []).filter((request) => request.status === "pending"); panel.classList.toggle("hidden", currentUser()?.role !== "admin"); byId("pendingCount").textContent = pending.length; byId("pendingList").innerHTML = pending.length ? pending.map((request) => `<div class="mini-item"><div><strong>${escapeHtml(request.name)}</strong><span>${escapeHtml(request.department)} · ${escapeHtml(request.loginId || "")}</span></div><button class="mini-button" data-action="approve-signup" data-request-id="${request.id}" type="button">승인</button></div>`).join("") : `<div class="mini-empty">대기 중인 신청 없음</div>`; }
 function renderCalendar() { const posts = state.posts.filter((post) => post.startDate || post.dueDate).sort((a, b) => String(a.dueDate || a.startDate).localeCompare(String(b.dueDate || b.startDate))); byId("calendarList").innerHTML = posts.length ? posts.map((post) => `<div class="mini-item calendar-item"><div><strong>${escapeHtml(post.title)}</strong><span>${postTypeLabel(post.type)} · ${escapeHtml(dateText(post).replace(/^ · /, ""))}</span></div></div>`).join("") : `<div class="mini-empty">등록된 일정 없음</div>`; }
 function formatDate(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "방금" : `${date.getMonth() + 1}.${date.getDate()}`; }
 
 document.addEventListener("click", (event) => { const focusTarget = event.target.closest("[data-focus-comment]"); if (focusTarget) { const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; } const target = event.target.closest("[data-action]"); if (!target || target.tagName === "FORM") return; if (target.dataset.action === "reaction") state = S.addReaction(state, { postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker });
-  if (target.dataset.action === "download-file") state = S.recordFileDownload(state, { postId: target.dataset.postId, userId: currentUserId }); if (target.dataset.action === "approve-signup") state = S.approveSignupRequest(state, target.dataset.requestId); saveState(); render(); });
+  if (target.dataset.action === "download-file") state = S.recordFileDownload(state, { postId: target.dataset.postId, userId: currentUserId }); if (target.dataset.action === "approve-signup") { if (remoteAuth()) { window.BigHubSupabase.approveProfile(target.dataset.requestId).then(refreshRemoteUsers).then(render); return; } state = S.approveSignupRequest(state, target.dataset.requestId); } saveState(); render(); });
 
 document.addEventListener("submit", (event) => { const form = event.target.closest("[data-action]"); if (!form) return; event.preventDefault(); const data = Object.fromEntries(new FormData(form)); if (form.dataset.action === "comment") state = S.addComment(state, { ...data, postId: form.dataset.postId, userId: currentUserId }); saveState(); form.reset(); render(); });
 

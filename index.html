@@ -13,14 +13,15 @@
         <div class="auth-grid">
           <form id="loginForm" class="auth-form">
             <h1>로그인</h1>
-            <input name="name" placeholder="실명" required />
-            <input name="password" type="password" placeholder="비밀번호" required />
+            <input name="loginId" placeholder="아이디" autocomplete="username" required />
+            <input name="password" type="password" placeholder="비밀번호" autocomplete="current-password" required />
             <button type="submit">로그인</button>
             <p id="loginMessage" class="form-message"></p>
-            <p class="form-help">관리자 데모 계정: 관리자 / admin1234</p>
+            <p class="form-help">관리자 데모 계정: admin / admin1234</p>
           </form>
           <form id="signupForm" class="auth-form">
             <h1>가입 신청</h1>
+            <input name="loginId" placeholder="아이디" autocomplete="username" required />
             <input name="name" placeholder="실명" required />
             <select name="department" required>
               <option value="">부서 선택</option>
@@ -31,8 +32,8 @@
               <option value="마케팅">마케팅</option>
               <option value="기타">기타</option>
             </select>
-            <input name="password" type="password" placeholder="비밀번호" required />
-            <input name="passwordConfirm" type="password" placeholder="비밀번호 확인" required />
+            <input name="password" type="password" placeholder="비밀번호" autocomplete="new-password" required />
+            <input name="passwordConfirm" type="password" placeholder="비밀번호 확인" autocomplete="new-password" required />
             <button type="submit">가입 신청</button>
             <p id="signupMessage" class="form-message"></p>
           </form>
