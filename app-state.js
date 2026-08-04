@@ -6,22 +6,25 @@
   }
 })(typeof self !== "undefined" ? self : this, function () {
   const memberIds = ["u-1", "u-2", "u-3", "u-4"];
+  const departments = ["임원", "경영지원", "개발", "운영", "마케팅", "기타"];
 
   function createInitialState(now = new Date().toISOString()) {
     return {
       users: [
-        { id: "u-admin", name: "교육 운영자", role: "admin", avatar: "운" },
-        { id: "u-1", name: "김민지", role: "member", avatar: "민" },
-        { id: "u-2", name: "박준호", role: "member", avatar: "준" },
-        { id: "u-3", name: "이서연", role: "member", avatar: "서" },
-        { id: "u-4", name: "최현우", role: "member", avatar: "현" },
+        { id: "u-admin", name: "관리자", department: "임원", role: "admin", avatar: "관", password: "admin1234", approvedAt: now },
+        { id: "u-1", name: "김민지", department: "개발", role: "member", avatar: "민", password: "pass1234", approvedAt: now },
+        { id: "u-2", name: "박준호", department: "운영", role: "member", avatar: "준", password: "pass1234", approvedAt: now },
+        { id: "u-3", name: "이서연", department: "마케팅", role: "member", avatar: "서", password: "pass1234", approvedAt: now },
+        { id: "u-4", name: "최현우", department: "경영지원", role: "member", avatar: "현", password: "pass1234", approvedAt: now },
       ],
       posts: [],
       reactions: [],
       comments: [],
+      downloads: [],
       resources: [],
       questions: [],
       answers: [],
+      signupRequests: [],
       createdAt: now,
     };
   }
@@ -34,6 +37,12 @@
     return String(value || "").trim();
   }
 
+  function normalizeList(value) {
+    if (Array.isArray(value)) return value.filter(Boolean);
+    if (!value) return [];
+    return String(value).split(",").map((item) => item.trim()).filter(Boolean);
+  }
+
   function addPost(state, input, now = new Date().toISOString()) {
     const post = {
       id: nextId("post", state.posts),
@@ -43,7 +52,10 @@
       authorId: input.authorId,
       mediaUrl: trim(input.mediaUrl || input.videoUrl),
       attachmentUrl: trim(input.attachmentUrl),
+      startDate: trim(input.startDate),
       dueDate: trim(input.dueDate),
+      targetUserIds: normalizeList(input.targetUserIds),
+      completionRules: normalizeList(input.completionRules),
       createdAt: now,
     };
     return { ...state, posts: [post, ...state.posts] };
@@ -126,22 +138,87 @@
     };
   }
 
+  function recordFileDownload(state, input, now = new Date().toISOString()) {
+    const existing = (state.downloads || []).find((download) => download.postId === input.postId && download.userId === input.userId);
+    if (existing) return state;
+    const download = {
+      id: nextId("download", state.downloads || []),
+      postId: input.postId,
+      userId: input.userId,
+      createdAt: now,
+    };
+    return { ...state, downloads: [download, ...(state.downloads || [])] };
+  }
+
+  function createSignupRequest(state, input, now = new Date().toISOString()) {
+    const name = trim(input.name);
+    const department = trim(input.department);
+    const password = trim(input.password);
+    const passwordConfirm = trim(input.passwordConfirm);
+    if (!name) throw new Error("name is required");
+    if (!departments.includes(department)) throw new Error("department is invalid");
+    if (password.length < 6) throw new Error("password is too short");
+    if (password !== passwordConfirm) throw new Error("password confirmation does not match");
+    if (state.users.some((user) => user.name === name) || state.signupRequests.some((request) => request.name === name && request.status === "pending")) {
+      throw new Error("name already exists");
+    }
+    const request = {
+      id: nextId("signup", state.signupRequests || []),
+      name,
+      department,
+      password,
+      status: "pending",
+      createdAt: now,
+    };
+    return { ...state, signupRequests: [request, ...(state.signupRequests || [])] };
+  }
+
+  function approveSignupRequest(state, requestId, now = new Date().toISOString()) {
+    const request = (state.signupRequests || []).find((item) => item.id === requestId);
+    if (!request || request.status !== "pending") return state;
+    const user = {
+      id: `u-${state.users.length}`,
+      name: request.name,
+      department: request.department,
+      role: "member",
+      avatar: request.name.slice(0, 1),
+      password: request.password,
+      approvedAt: now,
+    };
+    return {
+      ...state,
+      users: [...state.users, user],
+      signupRequests: state.signupRequests.map((item) => item.id === requestId ? { ...item, status: "approved", approvedAt: now, userId: user.id } : item),
+    };
+  }
+
+  function authenticateUser(state, input) {
+    const name = trim(input.name);
+    const password = trim(input.password);
+    const user = state.users.find((item) => item.name === name && item.password === password && item.approvedAt);
+    return user ? { ...user, password: undefined } : null;
+  }
+
   function getPostCompletion(state, postId) {
-    const completed = new Set();
-    state.reactions.forEach((reaction) => {
-      if (reaction.postId === postId && reaction.sticker === "done") completed.add(reaction.userId);
-    });
-    state.comments.forEach((comment) => {
-      if (comment.postId === postId) completed.add(comment.userId);
-    });
-    const completedUserIds = Array.from(completed).sort();
+    const post = state.posts.find((item) => item.id === postId) || {};
+    const targets = post.targetUserIds && post.targetUserIds.length ? post.targetUserIds : memberIds;
+    const rules = post.type === "mission" && post.completionRules && post.completionRules.length ? post.completionRules : ["doneOrComment"];
+    const completedUserIds = targets.filter((userId) => rules.every((rule) => hasCheckpoint(state, postId, userId, rule))).sort();
     return {
       postId,
-      totalMembers: memberIds.length,
+      totalMembers: targets.length,
       completedCount: completedUserIds.length,
       completedUserIds,
-      percent: Math.round((completedUserIds.length / memberIds.length) * 100),
+      percent: targets.length ? Math.round((completedUserIds.length / targets.length) * 100) : 0,
     };
+  }
+
+  function hasCheckpoint(state, postId, userId, rule) {
+    if (rule === "download") return (state.downloads || []).some((download) => download.postId === postId && download.userId === userId);
+    if (rule === "done") return state.reactions.some((reaction) => reaction.postId === postId && reaction.userId === userId && reaction.sticker === "done");
+    if (rule === "comment") return state.comments.some((comment) => comment.postId === postId && comment.userId === userId);
+    if (rule === "doneOrComment") return hasCheckpoint(state, postId, userId, "done") || hasCheckpoint(state, postId, userId, "comment");
+    return false;
   }
 
   function getLinkPreview(url) {
@@ -186,6 +263,7 @@
     addPost,
     addReaction,
     addComment,
+    recordFileDownload,
     addResource,
     addQuestion,
     addAnswer,
@@ -193,7 +271,14 @@
     getPostCompletion,
     getLinkPreview,
     getPostPresentation,
+    createSignupRequest,
+    approveSignupRequest,
+    authenticateUser,
+    departments,
   };
 });
+
+
+
 
 

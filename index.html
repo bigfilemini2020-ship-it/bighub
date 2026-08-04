@@ -3,29 +3,58 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI 교육 피드</title>
+    <title>BigHub</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <section id="authView" class="auth-view">
+      <div class="auth-card">
+        <div class="auth-brand"><div class="rail-logo">BH</div><div><strong>BigHub</strong><span>빅파일 사내 커뮤니케이션 허브</span></div></div>
+        <div class="auth-grid">
+          <form id="loginForm" class="auth-form">
+            <h1>로그인</h1>
+            <input name="name" placeholder="실명" required />
+            <input name="password" type="password" placeholder="비밀번호" required />
+            <button type="submit">로그인</button>
+            <p id="loginMessage" class="form-message"></p>
+            <p class="form-help">관리자 데모 계정: 관리자 / admin1234</p>
+          </form>
+          <form id="signupForm" class="auth-form">
+            <h1>가입 신청</h1>
+            <input name="name" placeholder="실명" required />
+            <select name="department" required>
+              <option value="">부서 선택</option>
+              <option value="임원">임원</option>
+              <option value="경영지원">경영지원</option>
+              <option value="개발">개발</option>
+              <option value="운영">운영</option>
+              <option value="마케팅">마케팅</option>
+              <option value="기타">기타</option>
+            </select>
+            <input name="password" type="password" placeholder="비밀번호" required />
+            <input name="passwordConfirm" type="password" placeholder="비밀번호 확인" required />
+            <button type="submit">가입 신청</button>
+            <p id="signupMessage" class="form-message"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <div id="appShell" class="app-shell hidden">
       <aside class="rail expanded" aria-label="주요 메뉴">
-        <div class="rail-brand"><div class="rail-logo">AI</div><strong>AI 교육피드</strong></div>
+        <div class="rail-brand"><div class="rail-logo">BH</div><strong>BigHub</strong></div>
         <button class="rail-button active" data-view="feed" type="button"><span>⌂</span><strong>홈</strong></button>
         <button class="rail-button" data-view="search" type="button"><span>⌕</span><strong>검색</strong></button>
         <button class="rail-button" data-action="compose-focus" type="button"><span>＋</span><strong>글쓰기</strong></button>
         <button class="rail-button" data-view="feed" type="button"><span>?</span><strong>질문</strong></button>
-        <button class="rail-button" data-view="progress" type="button"><span>▤</span><strong>대시보드</strong></button>
+        <button class="rail-button" data-view="progress" type="button"><span>▤</span><strong>현황</strong></button>
         <button class="rail-button" data-action="profile" type="button"><span>●</span><strong>프로필</strong></button>
         <button id="resetDemo" class="rail-button rail-bottom" type="button"><span>↺</span><strong>초기화</strong></button>
       </aside>
 
       <main class="feed-layout">
         <section class="feed-column">
-          <header class="mobile-header">
-            <strong>AI 교육 피드</strong>
-            <select id="currentUserMobile"></select>
-          </header>
-
+          <header class="mobile-header"><strong>BigHub</strong></header>
           <section id="feedView" class="view active">
             <div class="filter-row" role="group" aria-label="피드 필터">
               <button class="filter-chip active" data-filter="all" type="button">전체</button>
@@ -36,27 +65,19 @@
             </div>
             <div id="postList" class="post-stack"></div>
           </section>
-
           <section id="searchView" class="view">
-            <div class="search-panel">
-              <h2>검색</h2>
-              <input id="globalSearch" class="search-input" placeholder="게시글, 공지, 미션, 질문 검색" />
-            </div>
+            <div class="search-panel"><h2>검색</h2><input id="globalSearch" class="search-input" placeholder="게시글, 공지, 미션, 질문 검색" /></div>
             <div id="searchResults" class="post-stack"></div>
           </section>
-
           <section id="progressView" class="view">
-            <div class="progress-sections">
-              <section><h2>참가자별 확인</h2><div id="userProgress" class="post-stack"></div></section>
-              <section><h2>게시물별 확인</h2><div id="postProgress" class="post-stack"></div></section>
-            </div>
+            <div class="progress-sections"><section><h2>참가자별 확인</h2><div id="userProgress" class="post-stack"></div></section><section><h2>게시물별 확인</h2><div id="postProgress" class="post-stack"></div></section></div>
           </section>
         </section>
-
         <aside class="side-panel">
-          <div class="profile-card"><div class="avatar current" id="currentAvatar">운</div><div><strong id="currentName">교육 운영자</strong><span id="currentRole">admin</span></div></div>
-          <div class="account-actions"><button class="ghost-button" type="button">로그아웃</button><label for="currentUser">계정 전환</label><select id="currentUser"></select></div>
+          <div class="profile-card"><div class="avatar current" id="currentAvatar">관</div><div><strong id="currentName">관리자</strong><span id="currentRole">admin</span></div><button id="logoutButton" class="mini-button" type="button">로그아웃</button></div>
+          <div id="approvalPanel" class="panel-block approvals hidden"><div class="panel-title"><strong>가입 승인</strong><span id="pendingCount">0</span></div><div id="pendingList" class="mini-list"></div></div>
           <div id="quickStats" class="panel-block stats"></div>
+          <div class="panel-block calendar-panel"><div class="panel-title"><strong>일정</strong><span>마감</span></div><div id="calendarList" class="mini-list"></div></div>
         </aside>
       </main>
     </div>
@@ -64,28 +85,17 @@
     <div id="composeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="composeTitle">
       <div class="modal-backdrop" data-action="close-compose"></div>
       <section class="compose-dialog">
-        <header class="compose-header">
-          <button class="modal-close" data-action="close-compose" type="button" aria-label="닫기">×</button>
-          <h2 id="composeTitle">새 게시물 만들기</h2>
-          <span></span>
-        </header>
+        <header class="compose-header"><button class="modal-close" data-action="close-compose" type="button" aria-label="닫기">×</button><h2 id="composeTitle">새 게시물 만들기</h2><span></span></header>
         <form id="postForm" class="modal-form">
-          <div class="upload-drop">
-            <div class="upload-icon">▧</div>
-            <strong>게시글 유형과 첨부를 한 번에 선택하세요</strong>
-            <p>일반, 공지, 미션, 질문 모두 같은 폼으로 작성하고 파일/이미지/영상 링크를 첨부할 수 있습니다.</p>
-          </div>
-          <select name="type" aria-label="글 유형">
-            <option value="general">일반 게시글</option>
-            <option value="notice">공지</option>
-            <option value="mission">미션</option>
-            <option value="question">질문</option>
-          </select>
+          <div class="upload-drop"><div class="upload-icon">▧</div><strong>게시글 유형과 첨부를 한 번에 선택하세요</strong><p>일반, 공지, 미션, 질문 모두 같은 폼으로 작성하고 파일/이미지/영상 링크를 첨부할 수 있습니다.</p></div>
+          <select name="type" aria-label="글 유형"><option value="general">일반 게시글</option><option value="notice">공지</option><option value="mission">미션</option><option value="question">질문</option></select>
           <input name="title" placeholder="제목" required />
           <textarea name="body" placeholder="내용" required></textarea>
+          <div class="date-grid"><input name="startDate" type="date" aria-label="시작일" /><input name="dueDate" type="date" aria-label="마감일" /></div>
+          <fieldset class="mission-settings"><legend>미션 설정</legend><div><strong>참여 인원</strong><div id="missionTargets" class="check-grid"></div></div><div><strong>완료 방식</strong><label><input type="checkbox" name="completionRules" value="download" /> 첨부 다운로드</label><label><input type="checkbox" name="completionRules" value="done" checked /> 완료 버튼</label><label><input type="checkbox" name="completionRules" value="comment" /> 댓글 작성</label></div></fieldset>
           <input name="mediaUrl" placeholder="영상/HTML/이미지 링크" />
           <input name="attachmentUrl" placeholder="첨부파일 다운로드 링크" />
-          <p class="form-help">질문도 피드에 올라가며 댓글로 답변을 받을 수 있습니다.</p>
+          <p class="form-help">기간을 지정하면 우측 일정에 표시됩니다.</p>
           <button type="submit">게시</button>
         </form>
       </section>
@@ -96,3 +106,4 @@
     <script src="app.js"></script>
   </body>
 </html>
+

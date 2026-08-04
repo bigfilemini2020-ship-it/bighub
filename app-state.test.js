@@ -9,6 +9,10 @@ const {
   getPostCompletion,
   getLinkPreview,
   getPostPresentation,
+  recordFileDownload,
+  createSignupRequest,
+  approveSignupRequest,
+  authenticateUser,
 } = require("./app-state");
 
 const now = "2026-08-04T09:00:00.000Z";
@@ -142,3 +146,66 @@ test("post presentation separates media cards from text thread cards", () => {
 
 
 
+
+test("signup request waits for admin approval before login", () => {
+  let state = createInitialState(now);
+  state = createSignupRequest(state, {
+    name: "홍길동",
+    department: "개발",
+    password: "pass1234",
+    passwordConfirm: "pass1234",
+  }, now);
+
+  assert.equal(state.signupRequests.length, 1);
+  assert.equal(state.signupRequests[0].status, "pending");
+  assert.equal(authenticateUser(state, { name: "홍길동", password: "pass1234" }), null);
+
+  state = approveSignupRequest(state, state.signupRequests[0].id, now);
+  const user = authenticateUser(state, { name: "홍길동", password: "pass1234" });
+
+  assert.equal(user.name, "홍길동");
+  assert.equal(user.department, "개발");
+  assert.equal(user.role, "member");
+});
+
+test("signup validates department and matching password", () => {
+  const state = createInitialState(now);
+
+  assert.throws(() => createSignupRequest(state, {
+    name: "홍길동",
+    department: "없는부서",
+    password: "pass1234",
+    passwordConfirm: "pass1234",
+  }, now), /department/);
+
+  assert.throws(() => createSignupRequest(state, {
+    name: "홍길동",
+    department: "개발",
+    password: "pass1234",
+    passwordConfirm: "different",
+  }, now), /password/);
+});
+
+test("mission completion can require selected people and multiple checkpoints", () => {
+  let state = createInitialState(now);
+  state = addPost(state, {
+    type: "mission",
+    title: "Watch training video",
+    body: "Download, watch, then mark complete.",
+    authorId: "u-admin",
+    attachmentUrl: "https://example.com/video.mp4",
+    targetUserIds: ["u-1", "u-2"],
+    completionRules: ["download", "done"],
+  }, now);
+
+  const postId = state.posts[0].id;
+  state = recordFileDownload(state, { postId, userId: "u-1" }, now);
+  state = addReaction(state, { postId, userId: "u-1", sticker: "done" }, now);
+  state = addReaction(state, { postId, userId: "u-2", sticker: "done" }, now);
+
+  const completion = getPostCompletion(state, postId);
+
+  assert.equal(completion.totalMembers, 2);
+  assert.equal(completion.completedCount, 1);
+  assert.deepEqual(completion.completedUserIds, ["u-1"]);
+});
