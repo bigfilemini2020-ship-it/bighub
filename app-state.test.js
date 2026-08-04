@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   createInitialState,
   addPost,
+  updatePost,
   addReaction,
   addComment,
   getPostCompletion,
@@ -38,6 +39,42 @@ test("supports general, notice, mission, and question post types", () => {
   assert.deepEqual(state.posts.map((post) => post.type).sort(), ["general", "mission", "notice", "question"]);
 });
 
+
+test("post author or admin can edit a post without losing activity", () => {
+  let state = createInitialState(now);
+  state = addPost(state, {
+    type: "notice",
+    title: "Original",
+    body: "첫 줄\n\n둘째 줄",
+    authorId: "u-admin",
+  }, now);
+
+  const postId = state.posts[0].id;
+  state = addReaction(state, { postId, userId: "u-1", sticker: "like" }, now);
+  state = addComment(state, { postId, userId: "u-1", body: "확인" }, now);
+  state = updatePost(state, postId, {
+    type: "notice",
+    title: "Updated",
+    body: "첫 줄\n\n수정된 둘째 줄",
+    startDate: "",
+    dueDate: "",
+  }, "u-admin", "2026-08-04T10:00:00.000Z");
+
+  assert.equal(state.posts[0].title, "Updated");
+  assert.equal(state.posts[0].body, "첫 줄\n\n수정된 둘째 줄");
+  assert.equal(state.posts[0].updatedAt, "2026-08-04T10:00:00.000Z");
+  assert.equal(state.reactions.length, 1);
+  assert.equal(state.comments.length, 1);
+});
+
+test("non-author members cannot edit another user's post", () => {
+  let state = createInitialState(now);
+  state = addPost(state, { type: "general", title: "Keep", body: "body", authorId: "u-1" }, now);
+
+  state = updatePost(state, state.posts[0].id, { type: "general", title: "Blocked", body: "changed" }, "u-2", now);
+
+  assert.equal(state.posts[0].title, "Keep");
+});
 test("like and done reactions are independent and toggle off", () => {
   let state = createInitialState(now);
   state = addPost(state, {

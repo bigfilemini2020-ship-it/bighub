@@ -8,6 +8,7 @@ let state = loadState();
 let currentUserId = localStorage.getItem(autoLoginKey) === "1" ? localStorage.getItem(sessionKey) || "" : sessionStorage.getItem(sessionKey) || "";
 let activeView = "feed";
 let postFilter = "all";
+let editingPostId = "";
 
 function loadState() {
   const saved = localStorage.getItem(storeKey);
@@ -128,8 +129,47 @@ function bindNavigation() {
   byId("resetDemo").addEventListener("click", () => { localStorage.removeItem(storeKey); clearSession(); state = loadState(); currentUserId = ""; render(); });
 }
 
-function openComposeModal() { if (!currentUser()) return; byId("composeModal").classList.remove("hidden"); byId("postForm").querySelector("input[name='title']").focus(); }
-function closeComposeModal() { byId("composeModal").classList.add("hidden"); }
+function openComposeModal() {
+  if (!currentUser()) return;
+  editingPostId = "";
+  const form = byId("postForm");
+  form.reset();
+  byId("composeTitle").textContent = "새 게시물 만들기";
+  byId("driveUploadStatus").textContent = "";
+  updateMissionSettings();
+  byId("composeModal").classList.remove("hidden");
+  form.querySelector("input[name='title']").focus();
+}
+
+function openEditModal(postId) {
+  const post = state.posts.find((item) => item.id === postId);
+  if (!post || !canEditPost(post)) return;
+  editingPostId = post.id;
+  const form = byId("postForm");
+  form.reset();
+  form.elements.type.value = post.type || "general";
+  form.elements.title.value = post.title || "";
+  form.elements.body.value = post.body || "";
+  form.elements.startDate.value = post.startDate || "";
+  form.elements.dueDate.value = post.dueDate || "";
+  form.elements.mediaUrl.value = post.mediaUrl || "";
+  form.elements.attachmentUrl.value = post.attachmentUrl || "";
+  formDataCheckAll(form, "targetUserIds", post.targetUserIds || []);
+  formDataCheckAll(form, "completionRules", post.completionRules || []);
+  byId("composeTitle").textContent = "게시물 수정";
+  byId("driveUploadStatus").textContent = post.attachmentName ? `현재 첨부: ${post.attachmentName}` : "";
+  updateMissionSettings();
+  byId("composeModal").classList.remove("hidden");
+  form.querySelector("input[name='title']").focus();
+}
+
+function formDataCheckAll(form, name, values) {
+  if (!values.length) return;
+  const selected = new Set(values);
+  Array.from(form.querySelectorAll(`input[name='${name}']`)).forEach((input) => { input.checked = selected.has(input.value); });
+}
+
+function closeComposeModal() { byId("composeModal").classList.add("hidden"); editingPostId = ""; }
 async function authHeaders() {
   if (!remoteAuth()) throw new Error("Supabase 로그인이 필요합니다.");
   const token = await window.BigHubSupabase.accessToken();
@@ -248,7 +288,7 @@ function bindForms() {
       delete data.driveFile;
       data.targetUserIds = data.type === "mission" ? formData.getAll("targetUserIds") : [];
       data.completionRules = data.type === "mission" ? formData.getAll("completionRules") : [];
-      state = S.addPost(state, { ...data, authorId: currentUserId });
+      state = editingPostId ? S.updatePost(state, editingPostId, data, currentUserId) : S.addPost(state, { ...data, authorId: currentUserId });
       saveState();
       form.reset();
       if (status) status.textContent = "";
@@ -286,6 +326,8 @@ function renderMissionTargets() {
 
 function renderCurrentUser() { const item = currentUser(); const avatar = byId("currentAvatar"); avatar.classList.toggle("admin-icon", item.role === "admin"); avatar.textContent = item.role === "admin" ? "" : item.avatar || item.name.slice(0, 1); avatar.setAttribute("aria-label", item.role === "admin" ? "관리자" : item.name); byId("currentName").textContent = item.name; byId("currentRole").textContent = `${item.department} · ${item.role}`; }
 
+function canEditPost(post) { const item = currentUser(); return Boolean(item && (item.role === "admin" || post.authorId === item.id)); }
+
 function renderFeed() {
   document.querySelectorAll(".filter-chip").forEach((button) => button.classList.toggle("active", button.dataset.filter === postFilter));
   const posts = state.posts.filter((post) => postFilter === "all" || post.type === postFilter);
@@ -304,7 +346,8 @@ function postCardHtml(post) {
   const presentation = S.getPostPresentation(post);
   const cardClass = presentation.kind === "text" ? "feed-card text-card" : "feed-card media-card";
   const preview = presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post) : "";
-  return `<article class="${cardClass}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><span class="post-type">${postTypeLabel(post.type)}</span></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p>${escapeHtml(post.body)}</p>${attachmentHtml(post)}<p class="feed-counts">좋아요 ${likeCount} · 완료 ${doneCount}/${completion.totalMembers} · 댓글 ${comments.length}</p><div class="feed-actions">${actionButton(post.id, "like", mine, "heart", "좋아요")}${actionButton(post.id, "done", mine, "check", "완료")}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글</span></button>${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${comments.map(commentHtml).join("")}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요. 댓글도 완료로 기록됩니다." required /><button type="submit">게시</button></form></section></article>`;
+  const editButton = canEditPost(post) ? `<button class="post-edit-button" data-action="edit-post" data-post-id="${post.id}" type="button">수정</button>` : "";
+  return `<article class="${cardClass}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${editButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<p class="feed-counts">좋아요 ${likeCount} · 완료 ${doneCount}/${completion.totalMembers} · 댓글 ${comments.length}</p><div class="feed-actions">${actionButton(post.id, "like", mine, "heart", "좋아요")}${actionButton(post.id, "done", mine, "check", "완료")}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글</span></button>${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${comments.map(commentHtml).join("")}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요. 댓글도 완료로 기록됩니다." required /><button type="submit">게시</button></form></section></article>`;
 }
 
 function actionButton(postId, sticker, mine, icon, label) { const active = mine.some((reaction) => reaction.sticker === sticker) ? " active" : ""; return `<button class="icon-action ${sticker}${active}" data-action="reaction" data-post-id="${postId}" data-sticker="${sticker}" type="button" title="${label}" aria-label="${label}">${iconSvg(icon)}<span>${label}</span></button>`; }
@@ -347,6 +390,7 @@ document.addEventListener("click", async (event) => {
   if (focusTarget) { const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
   const target = event.target.closest("[data-action]");
   if (!target || target.tagName === "FORM") return;
+  if (target.dataset.action === "edit-post") { openEditModal(target.dataset.postId); return; }
   if (target.dataset.action === "reaction") state = S.addReaction(state, { postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker });
   if (target.dataset.action === "download-file") {
     const url = target.dataset.url || target.href;

@@ -1463,3 +1463,42 @@ textarea {
 .avatar {
   position: relative;
 }
+/* Post editing and readable body text */
+.post-text {
+  white-space: pre-line;
+}
+
+.post-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.post-edit-button {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: #4b5563;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.post-edit-button:hover,
+.post-edit-button:focus-visible {
+  border-color: #111827;
+  color: #111827;
+  background: #f8fafc;
+}
+
+@media (max-width: 560px) {
+  .post-tools {
+    gap: 6px;
+  }
+
+  .post-edit-button {
+    padding: 0 8px;
+  }
+}

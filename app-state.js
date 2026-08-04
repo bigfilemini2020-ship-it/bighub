@@ -54,13 +54,11 @@
     return String(value).split(",").map((item) => item.trim()).filter(Boolean);
   }
 
-  function addPost(state, input, now = new Date().toISOString()) {
-    const post = {
-      id: nextId("post", state.posts),
+  function postFields(input) {
+    return {
       type: input.type || "notice",
       title: trim(input.title),
       body: trim(input.body),
-      authorId: input.authorId,
       mediaUrl: trim(input.mediaUrl || input.videoUrl),
       attachmentUrl: trim(input.attachmentUrl),
       attachmentName: trim(input.attachmentName),
@@ -69,9 +67,36 @@
       dueDate: trim(input.dueDate),
       targetUserIds: normalizeList(input.targetUserIds),
       completionRules: normalizeList(input.completionRules),
+    };
+  }
+
+  function addPost(state, input, now = new Date().toISOString()) {
+    const post = {
+      id: nextId("post", state.posts),
+      ...postFields(input),
+      authorId: input.authorId,
       createdAt: now,
     };
     return { ...state, posts: [post, ...state.posts] };
+  }
+
+  function updatePost(state, postId, input, editorUserId, now = new Date().toISOString()) {
+    const editor = state.users.find((item) => item.id === editorUserId);
+    return {
+      ...state,
+      posts: state.posts.map((post) => {
+        if (post.id !== postId) return post;
+        if (!editor || (editor.role !== "admin" && post.authorId !== editorUserId)) return post;
+        const fields = postFields(input);
+        return {
+          ...post,
+          ...fields,
+          attachmentName: fields.attachmentName || post.attachmentName || "",
+          attachmentMimeType: fields.attachmentMimeType || post.attachmentMimeType || "",
+          updatedAt: now,
+        };
+      }),
+    };
   }
 
   function addReaction(state, input, now = new Date().toISOString()) {
@@ -283,6 +308,7 @@
   return {
     createInitialState,
     addPost,
+    updatePost,
     addReaction,
     addComment,
     recordFileDownload,
