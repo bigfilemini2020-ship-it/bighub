@@ -13,20 +13,31 @@ function stripWrappingQuotes(value) {
   return String(value || "").trim().replace(/^['"]|['"]$/g, "");
 }
 
+function normalizePemKey(value) {
+  const begin = "-----BEGIN PRIVATE KEY-----";
+  const end = "-----END PRIVATE KEY-----";
+  const start = value.indexOf(begin);
+  const finish = value.indexOf(end);
+  if (start === -1 || finish === -1) return value;
+  const body = value.slice(start + begin.length, finish).replace(/\s+/g, "");
+  const wrapped = body.match(/.{1,64}/g)?.join("\n") || body;
+  return `${begin}\n${wrapped}\n${end}\n`;
+}
+
 function normalizePrivateKey(value) {
   const raw = stripWrappingQuotes(value);
   try {
     const parsed = JSON.parse(raw);
     if (parsed && parsed.private_key) return normalizePrivateKey(parsed.private_key);
   } catch {}
-  let key = raw.replace(/\\n/g, "\n");
+  let key = raw.replace(/\\r\\n/g, "\n").replace(/\\n/g, "\n").replace(/\r/g, "");
   if (!key.includes("BEGIN PRIVATE KEY")) {
     try {
       const decoded = Buffer.from(key, "base64").toString("utf8").trim();
       if (decoded.includes("BEGIN PRIVATE KEY") || decoded.includes("private_key")) return normalizePrivateKey(decoded);
     } catch {}
   }
-  return key;
+  return normalizePemKey(key);
 }
 
 function googleAuthErrorMessage(error) {
