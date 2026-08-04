@@ -15,6 +15,23 @@ function sendJson(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+function escapeDriveQueryValue(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+async function findExistingFile({ token, folderId, name, size }) {
+  const query = [`'${escapeDriveQueryValue(folderId)}' in parents`, `name = '${escapeDriveQueryValue(name)}'`, "trashed = false"].join(" and ");
+  const url = new URL("https://www.googleapis.com/drive/v3/files");
+  url.searchParams.set("q", query);
+  url.searchParams.set("fields", "files(id,name,mimeType,size,createdTime)");
+  url.searchParams.set("orderBy", "createdTime desc");
+  url.searchParams.set("pageSize", "10");
+  const response = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+  if (!response.ok) return null;
+  const data = await response.json().catch(() => ({}));
+  return (data.files || []).find((file) => Number(file.size || 0) === size) || null;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return sendJson(res, 405, { error: "POST 요청만 가능합니다." });
 
@@ -32,6 +49,9 @@ module.exports = async function handler(req, res) {
     const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
     if (!folderId) throw new Error("GOOGLE_DRIVE_FOLDER_ID 환경변수가 없습니다.");
     const token = await getAccessToken();
+    const existing = await findExistingFile({ token, folderId, name, size });
+    if (existing) return sendJson(res, 200, { file: existing });
+
     const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,mimeType,size,webViewLink", {
       method: "POST",
       headers: {

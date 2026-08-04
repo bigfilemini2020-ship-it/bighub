@@ -267,6 +267,15 @@ async function uploadDriveFile(file) {
   });
   const session = await sessionResponse.json().catch(() => ({}));
   if (!sessionResponse.ok) throw new Error(session.error || "Drive 업로드 준비에 실패했습니다.");
+  if (session.file?.id) {
+    setUploadStatus("이미 Drive에 있는 파일 연결 중...", 100);
+    return {
+      id: session.file.id,
+      name: session.file.name || file.name,
+      mimeType: session.file.mimeType || file.type || "application/octet-stream",
+      downloadUrl: `/api/drive/download?id=${encodeURIComponent(session.file.id)}&name=${encodeURIComponent(session.file.name || file.name)}`,
+    };
+  }
 
   const chunkSize = 3 * 1024 * 1024;
   let uploaded;
