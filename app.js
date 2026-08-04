@@ -324,7 +324,7 @@ function renderMissionTargets() {
   target.innerHTML = state.users.filter((item) => item.role === "member").map((item) => `<label><input type="checkbox" name="targetUserIds" value="${item.id}" checked /> ${escapeHtml(item.name)} · ${escapeHtml(item.department || "")}</label>`).join("");
 }
 
-function renderCurrentUser() { const item = currentUser(); const avatar = byId("currentAvatar"); avatar.classList.toggle("admin-icon", item.role === "admin"); avatar.textContent = item.role === "admin" ? "" : item.avatar || item.name.slice(0, 1); avatar.setAttribute("aria-label", item.role === "admin" ? "관리자" : item.name); byId("currentName").textContent = item.name; byId("currentRole").textContent = `${item.department} · ${item.role}`; }
+function renderCurrentUser() { const item = currentUser(); const avatar = byId("currentAvatar"); avatar.classList.toggle("admin-icon", item.role === "admin"); avatar.textContent = item.role === "admin" ? "" : item.avatar || item.name.slice(0, 1); avatar.setAttribute("aria-label", item.role === "admin" ? "관리자" : item.name); byId("currentName").textContent = item.name; byId("currentRole").textContent = item.role === "admin" ? "admin" : `${item.department} · ${item.role}`; }
 
 function canEditPost(post) { const item = currentUser(); return Boolean(item && (item.role === "admin" || post.authorId === item.id)); }
 
