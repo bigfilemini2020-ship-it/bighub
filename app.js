@@ -3,6 +3,7 @@ const sessionKey = "bighub-session-v1";
 const rememberedLoginIdKey = "bighub-remembered-login-id";
 const autoLoginKey = "bighub-auto-login";
 const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
+const feedPositionKey = "bighub-feed-position-v1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -11,6 +12,8 @@ let activeView = "feed";
 let postFilter = "all";
 let editingPostId = "";
 let uploadedAttachment = null;
+let shouldRestoreFeedPosition = true;
+let feedPositionSaveTimer = 0;
 
 function loadState() {
   const saved = localStorage.getItem(storeKey);
@@ -31,12 +34,60 @@ function emptyHtml() { return byId("emptyTemplate").innerHTML; }
 function setSession(userId, autoLogin) { const primary = autoLogin ? localStorage : sessionStorage; const secondary = autoLogin ? sessionStorage : localStorage; primary.setItem(sessionKey, userId); secondary.removeItem(sessionKey); if (autoLogin) localStorage.setItem(autoLoginKey, "1"); else localStorage.removeItem(autoLoginKey); }
 function clearSession() { localStorage.removeItem(sessionKey); sessionStorage.removeItem(sessionKey); localStorage.removeItem(autoLoginKey); }
 function postTypeLabel(type) { return { general: "일반", notice: "공지", mission: "미션", question: "질문" }[type] || "일반"; }
+function feedPositionStorageKey() { return `${feedPositionKey}:${currentUserId || "guest"}`; }
+function readFeedPosition() {
+  if (!currentUserId) return null;
+  try { return JSON.parse(localStorage.getItem(feedPositionStorageKey()) || "null"); }
+  catch { return null; }
+}
+function applySavedFeedFilter() {
+  const saved = readFeedPosition();
+  if (saved?.userId === currentUserId && saved.filter) postFilter = saved.filter;
+}
+function currentVisiblePostId() {
+  const cards = Array.from(document.querySelectorAll(".feed-card[data-post-id]"));
+  const visible = cards.find((card) => card.getBoundingClientRect().bottom > 120) || cards[0];
+  return visible?.dataset.postId || "";
+}
+function saveFeedPosition() {
+  if (!currentUser() || activeView !== "feed") return;
+  localStorage.setItem(feedPositionStorageKey(), JSON.stringify({
+    userId: currentUserId,
+    filter: postFilter,
+    postId: currentVisiblePostId(),
+    scrollY: Math.max(0, Math.round(window.scrollY || 0)),
+    savedAt: Date.now()
+  }));
+}
+function scheduleSaveFeedPosition() {
+  if (feedPositionSaveTimer) return;
+  feedPositionSaveTimer = window.setTimeout(() => {
+    feedPositionSaveTimer = 0;
+    saveFeedPosition();
+  }, 200);
+}
+function restoreFeedPosition() {
+  if (!shouldRestoreFeedPosition || activeView !== "feed" || !currentUser()) return;
+  shouldRestoreFeedPosition = false;
+  const saved = readFeedPosition();
+  if (!saved || saved.userId !== currentUserId) return;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const target = Array.from(document.querySelectorAll(".feed-card[data-post-id]")).find((card) => card.dataset.postId === saved.postId);
+    if (target) {
+      target.scrollIntoView({ block: "start" });
+      window.scrollBy(0, -88);
+    } else if (Number.isFinite(saved.scrollY)) {
+      window.scrollTo(0, saved.scrollY);
+    }
+  }));
+}
 
 async function init() {
   bindAuthForms();
   bindNavigation();
   bindForms();
   if (remoteAuth()) await restoreRemoteSession();
+  applySavedFeedFilter();
   render();
 }
 
@@ -109,6 +160,8 @@ function bindAuthForms() {
       setSession(currentUserId, byId("autoLogin").checked);
       const syncError = remoteAuth() ? await tryRefreshRemoteData() : "";
       byId("loginMessage").textContent = "";
+      shouldRestoreFeedPosition = true;
+      applySavedFeedFilter();
       render();
       if (syncError) alert(`로그인은 됐지만 게시글 동기화에 실패했습니다. Supabase SQL 업데이트가 필요합니다.\n\n${syncError}`);
     } catch (error) {
@@ -144,7 +197,9 @@ function bindNavigation() {
   document.querySelectorAll(".rail-button[data-view]").forEach((button) => button.addEventListener("click", () => { activeView = button.dataset.view; render(); }));
   document.querySelector("[data-action='compose-focus']").addEventListener("click", openComposeModal);
   document.querySelectorAll("[data-action='close-compose']").forEach((item) => item.addEventListener("click", closeComposeModal));
-  document.querySelectorAll(".filter-chip").forEach((button) => button.addEventListener("click", () => { postFilter = button.dataset.filter; renderFeed(); }));
+  document.querySelectorAll(".filter-chip").forEach((button) => button.addEventListener("click", () => { postFilter = button.dataset.filter; saveFeedPosition(); renderFeed(); }));
+  window.addEventListener("scroll", scheduleSaveFeedPosition, { passive: true });
+  window.addEventListener("beforeunload", saveFeedPosition);
   byId("globalSearch").addEventListener("input", renderSearch);
   byId("logoutButton").addEventListener("click", async () => { if (remoteAuth()) await window.BigHubSupabase.signOut(); currentUserId = ""; clearSession(); render(); });
   byId("resetDemo").addEventListener("click", () => { localStorage.removeItem(storeKey); clearSession(); state = loadState(); currentUserId = ""; render(); });
@@ -422,7 +477,9 @@ function bindForms() {
       setUploadStatus("");
       closeComposeModal();
       activeView = "feed";
+      shouldRestoreFeedPosition = false;
       render();
+      window.scrollTo(0, 0);
     } catch (error) {
       setUploadStatus(error.message || "파일 업로드에 실패했습니다.");
       alert(error.message || "파일 업로드에 실패했습니다.");
@@ -443,7 +500,7 @@ function render() {
   document.querySelectorAll(".rail-button[data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === activeView));
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
   byId(`${activeView}View`).classList.add("active");
-  renderCurrentUser(); renderFeed(); renderSearch(); renderProgress(); renderStats(); renderApprovals(); renderCalendar();
+  renderCurrentUser(); renderFeed(); renderSearch(); renderProgress(); renderStats(); renderApprovals(); renderCalendar(); restoreFeedPosition();
 }
 
 function renderMissionTargets() {
@@ -476,7 +533,7 @@ function postCardHtml(post) {
   const preview = presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post) : "";
   const editButton = canEditPost(post) ? `<button class="post-edit-button" data-action="edit-post" data-post-id="${post.id}" type="button">수정</button>` : "";
   const doneLabel = post.type === "mission" ? `완료 ${doneCount}/${completion.totalMembers}` : `완료 ${doneCount}`;
-  return `<article class="${cardClass}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${editButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<div class="feed-actions">${actionButton(post.id, "like", mine, "heart", `좋아요 ${likeCount}`)}${actionButton(post.id, "done", mine, "check", doneLabel)}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글 ${comments.length}</span></button>${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${comments.map(commentHtml).join("")}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요. 댓글도 완료로 기록됩니다." required /><button type="submit">게시</button></form></section></article>`;
+  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${editButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<div class="feed-actions">${actionButton(post.id, "like", mine, "heart", `좋아요 ${likeCount}`)}${actionButton(post.id, "done", mine, "check", doneLabel)}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글 ${comments.length}</span></button>${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${comments.map(commentHtml).join("")}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요. 댓글도 완료로 기록됩니다." required /><button type="submit">게시</button></form></section></article>`;
 }
 
 function actionButton(postId, sticker, mine, icon, label) { const active = mine.some((reaction) => reaction.sticker === sticker) ? " active" : ""; return `<button class="icon-action ${sticker}${active}" data-action="reaction" data-post-id="${postId}" data-sticker="${sticker}" type="button" title="${label}" aria-label="${label}">${iconSvg(icon)}<span>${label}</span></button>`; }
