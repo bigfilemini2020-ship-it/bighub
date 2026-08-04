@@ -521,11 +521,7 @@ function renderFeed() {
 }
 
 function sortFeedPosts(posts) {
-  return [...posts].sort((a, b) => {
-    const noticeOrder = Number(b.type === "notice") - Number(a.type === "notice");
-    if (noticeOrder) return noticeOrder;
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-  });
+  return [...posts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 function postCardHtml(post) {
