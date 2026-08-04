@@ -170,6 +170,19 @@ function formDataCheckAll(form, name, values) {
 }
 
 function closeComposeModal() { byId("composeModal").classList.add("hidden"); editingPostId = ""; }
+function formatFileSize(bytes) {
+  const size = Number(bytes) || 0;
+  if (size < 1024) return `${size}B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)}KB`;
+  if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)}MB`;
+  return `${(size / 1024 / 1024 / 1024).toFixed(1)}GB`;
+}
+function updateDriveFileStatus() {
+  const file = byId("driveFileInput")?.files?.[0];
+  const status = byId("driveUploadStatus");
+  if (!status) return;
+  status.textContent = file ? `선택됨: ${file.name} (${formatFileSize(file.size)})` : "";
+}
 async function authHeaders() {
   if (!remoteAuth()) throw new Error("Supabase 로그인이 필요합니다.");
   const token = await window.BigHubSupabase.accessToken();
@@ -267,6 +280,7 @@ function bindForms() {
   renderMissionTargets();
   updateMissionSettings();
   byId("postTypeSelect")?.addEventListener("change", updateMissionSettings);
+  byId("driveFileInput")?.addEventListener("change", updateDriveFileStatus);
   byId("postForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;

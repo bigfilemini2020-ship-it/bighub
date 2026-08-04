@@ -9,11 +9,32 @@ function env(name) {
   return value;
 }
 
+function stripWrappingQuotes(value) {
+  return String(value || "").trim().replace(/^['"]|['"]$/g, "");
+}
+
 function normalizePrivateKey(value) {
-  return String(value || "")
-    .trim()
-    .replace(/^['"]|['"]$/g, "")
-    .replace(/\\n/g, "\n");
+  const raw = stripWrappingQuotes(value);
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.private_key) return normalizePrivateKey(parsed.private_key);
+  } catch {}
+  let key = raw.replace(/\\n/g, "\n");
+  if (!key.includes("BEGIN PRIVATE KEY")) {
+    try {
+      const decoded = Buffer.from(key, "base64").toString("utf8").trim();
+      if (decoded.includes("BEGIN PRIVATE KEY") || decoded.includes("private_key")) return normalizePrivateKey(decoded);
+    } catch {}
+  }
+  return key;
+}
+
+function googleAuthErrorMessage(error) {
+  const message = String(error?.message || "");
+  if (/DECODER routines|unsupported|PEM|private key/i.test(message)) {
+    return "Google Drive 인증키 형식이 맞지 않습니다. Vercel의 GOOGLE_PRIVATE_KEY에는 서비스 계정 JSON 안의 private_key 값만 넣어야 합니다.";
+  }
+  return message || "Google 인증에 실패했습니다.";
 }
 
 function base64url(input) {
@@ -34,7 +55,12 @@ function createJwt({ clientEmail, privateKey, now = Math.floor(Date.now() / 1000
     iat: now,
   };
   const unsigned = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(claim))}`;
-  const signature = crypto.createSign("RSA-SHA256").update(unsigned).sign(normalizePrivateKey(privateKey));
+  let signature;
+  try {
+    signature = crypto.createSign("RSA-SHA256").update(unsigned).sign(normalizePrivateKey(privateKey));
+  } catch (error) {
+    throw new Error(googleAuthErrorMessage(error));
+  }
   return `${unsigned}.${base64url(signature)}`;
 }
 
@@ -61,4 +87,4 @@ function safeFileName(value) {
   return name || "download";
 }
 
-module.exports = { normalizePrivateKey, createJwt, getAccessToken, safeFileName };
+module.exports = { normalizePrivateKey, googleAuthErrorMessage, createJwt, getAccessToken, safeFileName };
