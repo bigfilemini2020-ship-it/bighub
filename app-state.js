@@ -63,6 +63,8 @@
       authorId: input.authorId,
       mediaUrl: trim(input.mediaUrl || input.videoUrl),
       attachmentUrl: trim(input.attachmentUrl),
+      attachmentName: trim(input.attachmentName),
+      attachmentMimeType: trim(input.attachmentMimeType),
       startDate: trim(input.startDate),
       dueDate: trim(input.dueDate),
       targetUserIds: normalizeList(input.targetUserIds),

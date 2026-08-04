@@ -4,7 +4,8 @@ const SUPABASE_ANON_KEY = "sb_publishable_QShFn9QtmBMrdWBBEdVhuA_J1_wpnbj";
 function bearer(req) {
   const header = req.headers.authorization || req.headers.Authorization || "";
   const match = /^Bearer\s+(.+)$/i.exec(header);
-  return match ? match[1] : "";
+  if (match) return match[1];
+  return req.query && typeof req.query.token === "string" ? req.query.token : "";
 }
 
 async function requireApprovedUser(req) {
