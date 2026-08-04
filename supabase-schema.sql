@@ -72,6 +72,9 @@ alter table public.mission_targets enable row level security;
 alter table public.comments enable row level security;
 alter table public.reactions enable row level security;
 alter table public.mission_events enable row level security;
+alter table public.posts add column if not exists attachment_name text not null default '';
+alter table public.posts add column if not exists attachment_mime_type text not null default '';
+alter table public.posts add column if not exists updated_at timestamptz;
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.profiles to authenticated;
 grant select, insert, update, delete on public.posts to authenticated;
@@ -186,6 +189,8 @@ create policy "approved select mission targets" on public.mission_targets for se
 
 drop policy if exists "author or admin insert mission targets" on public.mission_targets;
 create policy "author or admin insert mission targets" on public.mission_targets for insert to authenticated with check (public.is_approved());
+drop policy if exists "author or admin delete mission targets" on public.mission_targets;
+create policy "author or admin delete mission targets" on public.mission_targets for delete to authenticated using (public.is_approved());
 
 drop policy if exists "approved select comments" on public.comments;
 create policy "approved select comments" on public.comments for select to authenticated using (public.is_approved());

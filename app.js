@@ -16,7 +16,7 @@ function loadState() {
   return S.createInitialState();
 }
 
-function saveState() { localStorage.setItem(storeKey, JSON.stringify(state)); }
+function saveState() { if (!remoteAuth()) localStorage.setItem(storeKey, JSON.stringify(state)); }
 function remoteAuth() { return window.BigHubSupabase && window.BigHubSupabase.isConfigured(); }
 function byId(id) { return document.getElementById(id); }
 function escapeHtml(value) { return String(value || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
@@ -44,16 +44,17 @@ async function restoreRemoteSession() {
     const profile = await window.BigHubSupabase.currentProfile();
     if (!profile) return;
     currentUserId = profile.id;
-    await refreshRemoteUsers();
+    await refreshRemoteData();
   } catch (error) {
     console.warn(error);
   }
 }
 
-async function refreshRemoteUsers() {
+async function refreshRemoteData() {
   if (!remoteAuth()) return;
   const users = await window.BigHubSupabase.listProfiles();
-  state = { ...state, users };
+  const content = await window.BigHubSupabase.listContent();
+  state = { ...state, users, ...content };
 }
 
 function setupAuthForms() {
@@ -87,7 +88,7 @@ function bindAuthForms() {
       const rememberId = byId("rememberId").checked || byId("autoLogin").checked;
       if (rememberId) localStorage.setItem(rememberedLoginIdKey, data.loginId || ""); else localStorage.removeItem(rememberedLoginIdKey);
       setSession(currentUserId, byId("autoLogin").checked);
-      if (remoteAuth()) await refreshRemoteUsers();
+      if (remoteAuth()) await refreshRemoteData();
       byId("loginMessage").textContent = "";
       render();
     } catch (error) {
@@ -106,7 +107,7 @@ function bindAuthForms() {
       }
       event.currentTarget.reset();
       byId("signupMessage").textContent = "가입 신청이 접수됐습니다. 관리자 승인 후 로그인할 수 있습니다.";
-      if (remoteAuth()) await refreshRemoteUsers();
+      if (remoteAuth()) await refreshRemoteData();
       setAuthMode("login");
       byId("loginMessage").textContent = "가입 신청이 접수됐습니다. 승인 후 로그인하세요.";
       alert("가입 신청이 접수됐습니다. 관리자 승인 후 로그인할 수 있습니다.");
@@ -233,8 +234,13 @@ async function downloadDriveFile(url, postId) {
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(objectUrl);
-  state = S.recordFileDownload(state, { postId, userId: currentUserId });
-  saveState();
+  if (remoteAuth()) {
+    await window.BigHubSupabase.recordFileDownload({ postId, userId: currentUserId });
+    await refreshRemoteData();
+  } else {
+    state = S.recordFileDownload(state, { postId, userId: currentUserId });
+    saveState();
+  }
 }
 
 function isDriveDownloadUrl(url) {
@@ -302,8 +308,15 @@ function bindForms() {
       delete data.driveFile;
       data.targetUserIds = data.type === "mission" ? formData.getAll("targetUserIds") : [];
       data.completionRules = data.type === "mission" ? formData.getAll("completionRules") : [];
-      state = editingPostId ? S.updatePost(state, editingPostId, data, currentUserId) : S.addPost(state, { ...data, authorId: currentUserId });
-      saveState();
+      if (remoteAuth()) {
+        const payload = { ...data, authorId: currentUserId };
+        if (editingPostId) await window.BigHubSupabase.updatePost(editingPostId, payload);
+        else await window.BigHubSupabase.createPost(payload);
+        await refreshRemoteData();
+      } else {
+        state = editingPostId ? S.updatePost(state, editingPostId, data, currentUserId) : S.addPost(state, { ...data, authorId: currentUserId });
+        saveState();
+      }
       form.reset();
       if (status) status.textContent = "";
       closeComposeModal();
@@ -406,12 +419,20 @@ document.addEventListener("click", async (event) => {
   const target = event.target.closest("[data-action]");
   if (!target || target.tagName === "FORM") return;
   if (target.dataset.action === "edit-post") { openEditModal(target.dataset.postId); return; }
-  if (target.dataset.action === "reaction") state = S.addReaction(state, { postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker });
+  if (target.dataset.action === "reaction") {
+    if (remoteAuth()) {
+      try { await window.BigHubSupabase.addReaction({ postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker }); await refreshRemoteData(); }
+      catch (error) { alert(error.message || "반응 저장에 실패했습니다."); }
+      render();
+      return;
+    }
+    state = S.addReaction(state, { postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker });
+  }
   if (target.dataset.action === "download-file") {
     const url = target.dataset.url || target.href;
     if (!isDriveDownloadUrl(url)) {
-      state = S.recordFileDownload(state, { postId: target.dataset.postId, userId: currentUserId });
-      saveState();
+      if (remoteAuth()) await window.BigHubSupabase.recordFileDownload({ postId: target.dataset.postId, userId: currentUserId });
+      else { state = S.recordFileDownload(state, { postId: target.dataset.postId, userId: currentUserId }); saveState(); }
       return;
     }
     event.preventDefault();
@@ -419,12 +440,28 @@ document.addEventListener("click", async (event) => {
     render();
     return;
   }
-  if (target.dataset.action === "approve-signup") { if (remoteAuth()) { window.BigHubSupabase.approveProfile(target.dataset.requestId).then(refreshRemoteUsers).then(render); return; } state = S.approveSignupRequest(state, target.dataset.requestId); }
+  if (target.dataset.action === "approve-signup") { if (remoteAuth()) { window.BigHubSupabase.approveProfile(target.dataset.requestId).then(refreshRemoteData).then(render); return; } state = S.approveSignupRequest(state, target.dataset.requestId); }
   saveState();
   render();
 });
 
-document.addEventListener("submit", (event) => { const form = event.target.closest("[data-action]"); if (!form) return; event.preventDefault(); const data = Object.fromEntries(new FormData(form)); if (form.dataset.action === "comment") state = S.addComment(state, { ...data, postId: form.dataset.postId, userId: currentUserId }); saveState(); form.reset(); render(); });
+document.addEventListener("submit", async (event) => {
+  const form = event.target.closest("[data-action]");
+  if (!form) return;
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(form));
+  if (form.dataset.action === "comment") {
+    if (remoteAuth()) {
+      try { await window.BigHubSupabase.addComment({ ...data, postId: form.dataset.postId, userId: currentUserId }); await refreshRemoteData(); }
+      catch (error) { alert(error.message || "댓글 저장에 실패했습니다."); return; }
+    } else {
+      state = S.addComment(state, { ...data, postId: form.dataset.postId, userId: currentUserId });
+      saveState();
+    }
+  }
+  form.reset();
+  render();
+});
 
 init();
 
