@@ -72,6 +72,16 @@ alter table public.mission_targets enable row level security;
 alter table public.comments enable row level security;
 alter table public.reactions enable row level security;
 alter table public.mission_events enable row level security;
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.profiles to authenticated;
+grant select, insert, update, delete on public.posts to authenticated;
+grant select, insert, update, delete on public.mission_targets to authenticated;
+grant select, insert, update, delete on public.comments to authenticated;
+grant select, insert, update, delete on public.reactions to authenticated;
+grant select, insert, update, delete on public.mission_events to authenticated;
+grant execute on function public.is_admin() to authenticated;
+grant execute on function public.is_approved() to authenticated;
+grant execute on function public.handle_new_user_profile() to authenticated;
 
 create or replace function public.is_admin()
 returns boolean

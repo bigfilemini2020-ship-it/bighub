@@ -2,6 +2,7 @@
 
 1. Supabase SQL Editor에서 `supabase-schema.sql` 전체를 실행한다.
    - 가입 신청용 profile 자동 생성 trigger가 포함되어 있다.
+   - 로그인/승인에 필요한 `profiles` 테이블 `GRANT` 권한이 포함되어 있다.
    - 기존에 Auth만 생성되고 profile이 빠진 사용자도 복구한다.
 2. Authentication > Sign In / Providers > Email에서 `Confirm email`을 끈다.
 3. Authentication > Users에서 관리자 계정을 만든다.

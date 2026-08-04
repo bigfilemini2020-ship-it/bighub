@@ -13,6 +13,27 @@
     return root.supabase.createClient(item.supabaseUrl, item.supabaseAnonKey);
   }
 
+  function userMessage(error, fallback) {
+    const text = String(error?.message || error || "").toLowerCase();
+    const code = String(error?.code || "").toLowerCase();
+    if (text.includes("already registered") || text.includes("already exists") || text.includes("duplicate key")) {
+      return "이미 가입 신청된 아이디입니다. 관리자 승인 후 로그인하세요.";
+    }
+    if (text.includes("invalid login credentials")) {
+      return "아이디 또는 비밀번호가 맞지 않습니다.";
+    }
+    if (text.includes("email not confirmed")) {
+      return "계정 확인이 아직 완료되지 않았습니다. 관리자에게 확인을 요청하세요.";
+    }
+    if (text.includes("permission denied") || text.includes("row-level security") || code === "42501") {
+      return "가입/로그인 정보 저장 권한이 없습니다. 관리자에게 Supabase SQL 업데이트를 요청하세요.";
+    }
+    if (code === "pgrst116" || text.includes("json object requested")) {
+      return "가입 신청 정보가 아직 생성되지 않았습니다. 관리자에게 Supabase SQL 업데이트를 요청하세요.";
+    }
+    return fallback || "요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도하세요.";
+  }
+
   function toUser(profile) {
     return {
       id: profile.id,
@@ -37,14 +58,14 @@
       password: input.password,
       options: { data: { login_id: loginId, name: input.name, department: input.department } },
     });
-    if (error) throw error;
-    if (!data.user) throw new Error("가입 계정을 만들지 못했습니다.");
+    if (error) throw new Error(userMessage(error, "가입 신청에 실패했습니다. 다시 시도하세요."));
+    if (!data.user) throw new Error("가입 계정을 만들지 못했습니다. 다시 시도하세요.");
     const { data: profile, error: profileError } = await auth
       .from("profiles")
       .select("id,status")
       .eq("id", data.user.id)
       .maybeSingle();
-    if (profileError) throw new Error("가입 신청 저장 권한 설정이 필요합니다. 관리자에게 Supabase SQL 업데이트를 요청하세요.");
+    if (profileError) throw new Error(userMessage(profileError));
     if (!profile) throw new Error("가입 신청 저장 설정이 아직 적용되지 않았습니다. Supabase SQL 업데이트 후 다시 신청하세요.");
     await auth.auth.signOut();
   }
@@ -53,9 +74,9 @@
     const auth = client();
     const email = root.EducationState.loginIdToAuthEmail(input.loginId);
     const { data, error } = await auth.auth.signInWithPassword({ email, password: input.password });
-    if (error) throw error;
+    if (error) throw new Error(userMessage(error, "로그인에 실패했습니다. 다시 시도하세요."));
     const { data: profile, error: profileError } = await auth.from("profiles").select("*").eq("id", data.user.id).single();
-    if (profileError) throw profileError;
+    if (profileError) throw new Error(userMessage(profileError));
     if (profile.status !== "approved") {
       await auth.auth.signOut();
       throw new Error("관리자 승인 대기 중입니다.");
@@ -78,13 +99,13 @@
 
   async function listProfiles() {
     const { data, error } = await client().from("profiles").select("*").order("created_at", { ascending: true });
-    if (error) throw error;
+    if (error) throw new Error(userMessage(error));
     return data.map(toUser);
   }
 
   async function approveProfile(id) {
     const { error } = await client().from("profiles").update({ status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
-    if (error) throw error;
+    if (error) throw new Error(userMessage(error, "가입 승인 처리에 실패했습니다."));
   }
 
   root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, approveProfile };
