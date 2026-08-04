@@ -9,6 +9,10 @@ function env(name) {
   return value;
 }
 
+function optionalEnv(name) {
+  return process.env[name] || "";
+}
+
 function stripWrappingQuotes(value) {
   return String(value || "").trim().replace(/^['"]|['"]$/g, "");
 }
@@ -75,22 +79,44 @@ function createJwt({ clientEmail, privateKey, now = Math.floor(Date.now() / 1000
   return `${unsigned}.${base64url(signature)}`;
 }
 
-async function getAccessToken(fetchImpl = fetch) {
-  const assertion = createJwt({
-    clientEmail: env("GOOGLE_CLIENT_EMAIL"),
-    privateKey: env("GOOGLE_PRIVATE_KEY"),
-  });
+async function requestToken(params, fetchImpl) {
   const response = await fetchImpl(TOKEN_URL, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion,
-    }),
+    body: new URLSearchParams(params),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error_description || data.error || "Google 인증에 실패했습니다.");
   return data.access_token;
+}
+
+function hasOAuthConfig() {
+  return Boolean(optionalEnv("GOOGLE_REFRESH_TOKEN") && optionalEnv("GOOGLE_OAUTH_CLIENT_ID") && optionalEnv("GOOGLE_OAUTH_CLIENT_SECRET"));
+}
+
+async function getOAuthAccessToken(fetchImpl = fetch) {
+  return requestToken({
+    client_id: env("GOOGLE_OAUTH_CLIENT_ID"),
+    client_secret: env("GOOGLE_OAUTH_CLIENT_SECRET"),
+    refresh_token: env("GOOGLE_REFRESH_TOKEN"),
+    grant_type: "refresh_token",
+  }, fetchImpl);
+}
+
+async function getServiceAccountAccessToken(fetchImpl = fetch) {
+  const assertion = createJwt({
+    clientEmail: env("GOOGLE_CLIENT_EMAIL"),
+    privateKey: env("GOOGLE_PRIVATE_KEY"),
+  });
+  return requestToken({
+    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    assertion,
+  }, fetchImpl);
+}
+
+async function getAccessToken(fetchImpl = fetch) {
+  if (hasOAuthConfig()) return getOAuthAccessToken(fetchImpl);
+  return getServiceAccountAccessToken(fetchImpl);
 }
 
 function safeFileName(value) {
@@ -98,4 +124,4 @@ function safeFileName(value) {
   return name || "download";
 }
 
-module.exports = { normalizePrivateKey, googleAuthErrorMessage, createJwt, getAccessToken, safeFileName };
+module.exports = { normalizePrivateKey, googleAuthErrorMessage, createJwt, getOAuthAccessToken, getServiceAccountAccessToken, getAccessToken, safeFileName };
