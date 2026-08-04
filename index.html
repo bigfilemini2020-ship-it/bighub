@@ -4,22 +4,28 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BigHub</title>
-    <link rel="stylesheet" href="styles.css?v=auth-mission-2" />
+    <link rel="icon" type="image/png" href="assets/bighub-icon.png" />
+    <link rel="stylesheet" href="styles.css?v=auth-flow-3" />
   </head>
   <body>
     <section id="authView" class="auth-view">
       <div class="auth-card">
         <div class="auth-brand"><div class="rail-logo">BH</div><div><strong>BigHub</strong><span>빅파일 사내 커뮤니케이션 허브</span></div></div>
-        <div class="auth-grid">
+        <div class="auth-panel">
           <form id="loginForm" class="auth-form">
             <h1>로그인</h1>
-            <input name="loginId" placeholder="아이디" autocomplete="username" required />
+            <input id="loginIdInput" name="loginId" placeholder="아이디" autocomplete="username" required />
             <input name="password" type="password" placeholder="비밀번호" autocomplete="current-password" required />
+            <div class="auth-options">
+              <label><input id="rememberId" type="checkbox" /> 아이디 저장</label>
+              <label><input id="autoLogin" type="checkbox" /> 자동 로그인</label>
+            </div>
             <button type="submit">로그인</button>
             <p id="loginMessage" class="form-message"></p>
+            <button id="showSignup" class="text-button" type="button">가입 신청</button>
             <p class="form-help">관리자 데모 계정: admin / admin1234</p>
           </form>
-          <form id="signupForm" class="auth-form">
+          <form id="signupForm" class="auth-form hidden">
             <h1>가입 신청</h1>
             <input name="loginId" placeholder="아이디" autocomplete="username" required />
             <input name="name" placeholder="실명" required />
@@ -36,6 +42,7 @@
             <input name="passwordConfirm" type="password" placeholder="비밀번호 확인" autocomplete="new-password" required />
             <button type="submit">가입 신청</button>
             <p id="signupMessage" class="form-message"></p>
+            <button id="showLogin" class="text-button" type="button">로그인으로 돌아가기</button>
           </form>
         </div>
       </div>
@@ -49,6 +56,7 @@
         <button class="rail-button" data-action="compose-focus" type="button"><span>＋</span><strong>글쓰기</strong></button>
         <button class="rail-button" data-view="feed" type="button"><span>?</span><strong>질문</strong></button>
         <button class="rail-button" data-view="progress" type="button"><span>▤</span><strong>현황</strong></button>
+        <button id="approvalMenuButton" class="rail-button admin-only hidden" data-view="approvals" type="button"><span>✓</span><strong>가입 승인</strong></button>
         <button class="rail-button" data-action="profile" type="button"><span>●</span><strong>프로필</strong></button>
         <button id="resetDemo" class="rail-button rail-bottom" type="button"><span>↺</span><strong>초기화</strong></button>
       </aside>
@@ -72,6 +80,9 @@
           </section>
           <section id="progressView" class="view">
             <div class="progress-sections"><section><h2>참가자별 확인</h2><div id="userProgress" class="post-stack"></div></section><section><h2>게시물별 확인</h2><div id="postProgress" class="post-stack"></div></section></div>
+          </section>
+          <section id="approvalsView" class="view">
+            <div class="approval-workspace"><div class="panel-title"><strong>가입 승인</strong><span id="approvalViewCount">0</span></div><div id="approvalViewList" class="post-stack"></div></div>
           </section>
         </section>
         <aside class="side-panel">
@@ -107,6 +118,6 @@
     <script src="supabase-config.js?v=supabase-2"></script>
     <script src="app-state.js?v=supabase-2"></script>
     <script src="supabase-client.js?v=supabase-2"></script>
-    <script src="app.js?v=supabase-2"></script>
+    <script src="app.js?v=auth-flow-3"></script>
   </body>
 </html>

@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   color-scheme: light;
   --bg: #ffffff;
   --surface: #ffffff;
@@ -902,7 +902,7 @@ textarea {
 }
 
 .auth-card {
-  width: min(920px, 100%);
+  width: min(520px, 100%);
   border: 1px solid var(--line);
   border-radius: 16px;
   background: white;
@@ -931,6 +931,10 @@ textarea {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px;
+}
+
+.auth-panel {
+  display: block;
 }
 
 .auth-form {
@@ -1030,8 +1034,52 @@ textarea {
 
 @media (max-width: 720px) {
   .auth-grid,
+  .auth-panel,
   .date-grid,
   .check-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.auth-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  align-items: center;
+  margin: 2px 0 4px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.auth-options label {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.auth-options input {
+  width: 16px;
+  height: 16px;
+}
+
+.auth-form .text-button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  background: white;
+  color: #111827;
+}
+
+.auth-form .text-button:hover,
+.auth-form .text-button:focus-visible {
+  border-color: #111827;
+}
+.approval-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.approval-card .feed-head {
+  align-items: center;
 }

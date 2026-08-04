@@ -1,9 +1,11 @@
 const storeKey = "bighub-state-v4";
 const sessionKey = "bighub-session-v1";
+const rememberedLoginIdKey = "bighub-remembered-login-id";
+const autoLoginKey = "bighub-auto-login";
 const S = window.EducationState;
 
 let state = loadState();
-let currentUserId = localStorage.getItem(sessionKey) || "";
+let currentUserId = localStorage.getItem(autoLoginKey) === "1" ? localStorage.getItem(sessionKey) || "" : sessionStorage.getItem(sessionKey) || "";
 let activeView = "feed";
 let postFilter = "all";
 
@@ -28,6 +30,8 @@ function currentUser() { return state.users.find((item) => item.id === currentUs
 function avatarHtml(userId) { const item = user(userId); const admin = item.role === "admin" ? " admin" : ""; return `<div class="avatar${admin}">${escapeHtml(item.avatar || item.name.slice(0, 1))}</div>`; }
 function linkHtml(url, label) { return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${label}</a>` : ""; }
 function emptyHtml() { return byId("emptyTemplate").innerHTML; }
+function setSession(userId, autoLogin) { const primary = autoLogin ? localStorage : sessionStorage; const secondary = autoLogin ? sessionStorage : localStorage; primary.setItem(sessionKey, userId); secondary.removeItem(sessionKey); if (autoLogin) localStorage.setItem(autoLoginKey, "1"); else localStorage.removeItem(autoLoginKey); }
+function clearSession() { localStorage.removeItem(sessionKey); sessionStorage.removeItem(sessionKey); localStorage.removeItem(autoLoginKey); }
 function postTypeLabel(type) { return { general: "일반", notice: "공지", mission: "미션", question: "질문" }[type] || "일반"; }
 
 async function init() {
@@ -39,6 +43,7 @@ async function init() {
 }
 
 async function restoreRemoteSession() {
+  if (localStorage.getItem(autoLoginKey) !== "1") { await window.BigHubSupabase.signOut(); return; }
   try {
     const profile = await window.BigHubSupabase.currentProfile();
     if (!profile) return;
@@ -55,7 +60,27 @@ async function refreshRemoteUsers() {
   state = { ...state, users };
 }
 
+function setupAuthForms() {
+  const savedId = localStorage.getItem(rememberedLoginIdKey) || "";
+  byId("loginIdInput").value = savedId;
+  byId("rememberId").checked = Boolean(savedId);
+  byId("autoLogin").checked = localStorage.getItem(autoLoginKey) === "1";
+  byId("showSignup").addEventListener("click", () => setAuthMode("signup"));
+  byId("showLogin").addEventListener("click", () => setAuthMode("login"));
+  byId("autoLogin").addEventListener("change", (event) => {
+    if (event.currentTarget.checked) byId("rememberId").checked = true;
+  });
+}
+
+function setAuthMode(mode) {
+  const signup = mode === "signup";
+  byId("loginForm").classList.toggle("hidden", signup);
+  byId("signupForm").classList.toggle("hidden", !signup);
+  byId("loginMessage").textContent = "";
+  byId("signupMessage").textContent = "";
+}
 function bindAuthForms() {
+  setupAuthForms();
   byId("loginForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
@@ -63,7 +88,9 @@ function bindAuthForms() {
       const user = remoteAuth() ? await window.BigHubSupabase.signIn(data) : S.authenticateUser(state, data);
       if (!user) { byId("loginMessage").textContent = "승인된 계정이 없거나 비밀번호가 맞지 않습니다."; return; }
       currentUserId = user.id;
-      localStorage.setItem(sessionKey, currentUserId);
+      const rememberId = byId("rememberId").checked || byId("autoLogin").checked;
+      if (rememberId) localStorage.setItem(rememberedLoginIdKey, data.loginId || ""); else localStorage.removeItem(rememberedLoginIdKey);
+      setSession(currentUserId, byId("autoLogin").checked);
       if (remoteAuth()) await refreshRemoteUsers();
       byId("loginMessage").textContent = "";
       render();
@@ -84,6 +111,8 @@ function bindAuthForms() {
       event.currentTarget.reset();
       byId("signupMessage").textContent = "가입 신청이 접수됐습니다. 관리자 승인 후 로그인할 수 있습니다.";
       if (remoteAuth()) await refreshRemoteUsers();
+      setAuthMode("login");
+      byId("loginMessage").textContent = "가입 신청이 접수됐습니다. 승인 후 로그인하세요.";
       render();
     } catch (error) {
       byId("signupMessage").textContent = error.message;
@@ -97,8 +126,8 @@ function bindNavigation() {
   document.querySelectorAll("[data-action='close-compose']").forEach((item) => item.addEventListener("click", closeComposeModal));
   document.querySelectorAll(".filter-chip").forEach((button) => button.addEventListener("click", () => { postFilter = button.dataset.filter; renderFeed(); }));
   byId("globalSearch").addEventListener("input", renderSearch);
-  byId("logoutButton").addEventListener("click", async () => { if (remoteAuth()) await window.BigHubSupabase.signOut(); currentUserId = ""; localStorage.removeItem(sessionKey); render(); });
-  byId("resetDemo").addEventListener("click", () => { localStorage.removeItem(storeKey); localStorage.removeItem(sessionKey); state = loadState(); currentUserId = ""; render(); });
+  byId("logoutButton").addEventListener("click", async () => { if (remoteAuth()) await window.BigHubSupabase.signOut(); currentUserId = ""; clearSession(); render(); });
+  byId("resetDemo").addEventListener("click", () => { localStorage.removeItem(storeKey); clearSession(); state = loadState(); currentUserId = ""; render(); });
 }
 
 function openComposeModal() { if (!currentUser()) return; byId("composeModal").classList.remove("hidden"); byId("postForm").querySelector("input[name='title']").focus(); }
@@ -126,6 +155,9 @@ function render() {
   byId("authView").classList.toggle("hidden", signedIn);
   byId("appShell").classList.toggle("hidden", !signedIn);
   if (!signedIn) return;
+  const admin = currentUser()?.role === "admin";
+  byId("approvalMenuButton").classList.toggle("hidden", !admin);
+  if (activeView === "approvals" && !admin) activeView = "feed";
   document.querySelectorAll(".rail-button[data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === activeView));
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
   byId(`${activeView}View`).classList.add("active");
@@ -170,7 +202,7 @@ function resultCard(type, title, body) { return `<article class="resource-card r
 function renderProgress() { const members = state.users.filter((item) => item.role === "member"); const posts = state.posts.filter((post) => post.type === "notice" || post.type === "mission"); byId("userProgress").innerHTML = members.map((item) => { const done = posts.filter((post) => S.getPostCompletion(state, post.id).completedUserIds.includes(item.id)).length; const percent = posts.length ? Math.round((done / posts.length) * 100) : 0; return progressCard(item.name, `${done}/${posts.length}개 완료`, percent); }).join("") || emptyHtml(); byId("postProgress").innerHTML = posts.map((post) => { const completion = S.getPostCompletion(state, post.id); return progressCard(post.title, `${completion.completedCount}/${completion.totalMembers}명 완료`, completion.percent); }).join("") || emptyHtml(); }
 function progressCard(title, meta, percent) { return `<article class="progress-card"><h3>${escapeHtml(title)}</h3><span class="feed-meta">${escapeHtml(meta)} · ${percent}%</span><div class="bar" aria-hidden="true"><span style="width: ${percent}%"></span></div></article>`; }
 function renderStats() { const questionCount = state.posts.filter((post) => post.type === "question").length; byId("quickStats").innerHTML = `<div class="stat-row"><span>게시물</span><strong>${state.posts.length}</strong></div><div class="stat-row"><span>질문</span><strong>${questionCount}</strong></div>`; }
-function renderApprovals() { const panel = byId("approvalPanel"); const pending = remoteAuth() ? state.users.filter((user) => user.status === "pending") : (state.signupRequests || []).filter((request) => request.status === "pending"); panel.classList.toggle("hidden", currentUser()?.role !== "admin"); byId("pendingCount").textContent = pending.length; byId("pendingList").innerHTML = pending.length ? pending.map((request) => `<div class="mini-item"><div><strong>${escapeHtml(request.name)}</strong><span>${escapeHtml(request.department)} · ${escapeHtml(request.loginId || "")}</span></div><button class="mini-button" data-action="approve-signup" data-request-id="${request.id}" type="button">승인</button></div>`).join("") : `<div class="mini-empty">대기 중인 신청 없음</div>`; }
+function renderApprovals() { const panel = byId("approvalPanel"); const pending = remoteAuth() ? state.users.filter((user) => user.status === "pending") : (state.signupRequests || []).filter((request) => request.status === "pending"); const admin = currentUser()?.role === "admin"; const compactHtml = pending.length ? pending.map((request) => `<div class="mini-item"><div><strong>${escapeHtml(request.name)}</strong><span>${escapeHtml(request.department)} · ${escapeHtml(request.loginId || "")}</span></div><button class="mini-button" data-action="approve-signup" data-request-id="${request.id}" type="button">승인</button></div>`).join("") : `<div class="mini-empty">대기 중인 신청 없음</div>`; const fullHtml = pending.length ? pending.map((request) => `<article class="feed-card text-card approval-card"><header class="feed-head"><div class="author-line"><div class="avatar">${escapeHtml((request.name || "?").slice(0, 1))}</div><div><strong>${escapeHtml(request.name)}</strong><span>${escapeHtml(request.department)} · ${escapeHtml(request.loginId || "")}</span></div></div><button class="mini-button" data-action="approve-signup" data-request-id="${request.id}" type="button">승인</button></header></article>`).join("") : emptyHtml(); panel.classList.toggle("hidden", !admin); byId("pendingCount").textContent = pending.length; byId("pendingList").innerHTML = compactHtml; byId("approvalViewCount").textContent = pending.length; byId("approvalViewList").innerHTML = fullHtml; }
 function renderCalendar() { const posts = state.posts.filter((post) => post.startDate || post.dueDate).sort((a, b) => String(a.dueDate || a.startDate).localeCompare(String(b.dueDate || b.startDate))); byId("calendarList").innerHTML = posts.length ? posts.map((post) => `<div class="mini-item calendar-item"><div><strong>${escapeHtml(post.title)}</strong><span>${postTypeLabel(post.type)} · ${escapeHtml(dateText(post).replace(/^ · /, ""))}</span></div></div>`).join("") : `<div class="mini-empty">등록된 일정 없음</div>`; }
 function formatDate(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "방금" : `${date.getMonth() + 1}.${date.getDate()}`; }
 
