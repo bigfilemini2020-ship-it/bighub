@@ -92,15 +92,15 @@ test("like and done reactions are independent and toggle off", () => {
   let completion = getPostCompletion(state, postId);
 
   assert.equal(state.reactions.length, 2);
-  assert.equal(completion.completedCount, 1);
-  assert.deepEqual(completion.completedUserIds, ["u-1"]);
+  assert.equal(completion.completedCount, 0);
+  assert.deepEqual(completion.completedUserIds, []);
 
   state = addReaction(state, { postId, userId: "u-1", sticker: "like" }, now);
   completion = getPostCompletion(state, postId);
 
   assert.equal(state.reactions.length, 1);
   assert.equal(state.reactions[0].sticker, "done");
-  assert.equal(completion.completedCount, 1);
+  assert.equal(completion.completedCount, 0);
 
   state = addReaction(state, { postId, userId: "u-1", sticker: "done" }, now);
   completion = getPostCompletion(state, postId);
@@ -241,7 +241,7 @@ test("signup validates department and matching password", () => {
     department: "없는부서",
     password: "pass1234",
     passwordConfirm: "pass1234",
-  }, now), /department/);
+  }, now), /부서/);
 
   assert.throws(() => createSignupRequest(state, {
     name: "홍길동",
@@ -249,14 +249,15 @@ test("signup validates department and matching password", () => {
     department: "개발",
     password: "pass1234",
     passwordConfirm: "different",
-  }, now), /password/);
+  }, now), /비밀번호/);
 });
 
 test("login id maps to internal auth email", () => {
   assert.equal(validateLoginId("kim_01"), "kim_01");
   assert.equal(loginIdToAuthEmail(" Kim_01 "), "kim_01@bighub.local");
-  assert.throws(() => validateLoginId("김민수"), /login id/);
-  assert.throws(() => validateLoginId("ab"), /login id/);
+  assert.throws(() => validateLoginId("김민수"), /아이디/);
+  assert.equal(validateLoginId("mk"), "mk");
+  assert.throws(() => validateLoginId("a"), /아이디/);
 });
 
 test("mission completion can require selected people and multiple checkpoints", () => {

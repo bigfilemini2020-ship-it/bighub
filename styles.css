@@ -1571,3 +1571,16 @@ textarea {
 .reply-form {
   margin-left: 18px;
 }
+.completion-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.completion-toggle input {
+  width: 16px;
+  height: 16px;
+}

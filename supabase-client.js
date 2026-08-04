@@ -16,6 +16,7 @@
   function userMessage(error, fallback) {
     const text = String(error?.message || error || "").toLowerCase();
     const code = String(error?.code || "").toLowerCase();
+    if (text.includes("login id is invalid") || text.includes("아이디는")) return "아이디는 영문 소문자, 숫자, 점, 밑줄, 하이픈으로 2~32자 입력하세요.";
     if (text.includes("already registered") || text.includes("already exists") || text.includes("duplicate key")) {
       return "이미 가입 신청된 아이디입니다. 관리자 승인 후 로그인하세요.";
     }

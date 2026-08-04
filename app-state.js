@@ -40,7 +40,7 @@
 
   function validateLoginId(value) {
     const loginId = trim(value).toLowerCase();
-    if (!/^[a-z0-9._-]{3,32}$/.test(loginId)) throw new Error("login id is invalid");
+    if (!/^[a-z0-9._-]{2,32}$/.test(loginId)) throw new Error("아이디는 영문 소문자, 숫자, 점, 밑줄, 하이픈으로 2~32자 입력하세요");
     return loginId;
   }
 
@@ -201,14 +201,14 @@
     const password = trim(input.password);
     const passwordConfirm = trim(input.passwordConfirm);
     if (!name) throw new Error("name is required");
-    if (!departments.includes(department)) throw new Error("department is invalid");
-    if (password.length < 6) throw new Error("password is too short");
-    if (password !== passwordConfirm) throw new Error("password confirmation does not match");
+    if (!departments.includes(department)) throw new Error("부서를 다시 선택하세요");
+    if (password.length < 6) throw new Error("비밀번호는 6자 이상 입력하세요");
+    if (password !== passwordConfirm) throw new Error("비밀번호 확인이 맞지 않습니다");
     const authEmail = loginIdToAuthEmail(loginId);
     const loginIdTaken = state.users.some((user) => user.loginId === loginId || user.authEmail === authEmail) || state.signupRequests.some((request) => request.loginId === loginId && request.status === "pending");
-    if (loginIdTaken) throw new Error("login id already exists");
+    if (loginIdTaken) throw new Error("이미 사용 중인 아이디입니다");
     if (state.users.some((user) => user.name === name) || state.signupRequests.some((request) => request.name === name && request.status === "pending")) {
-      throw new Error("name already exists");
+      throw new Error("이미 가입 신청된 이름입니다");
     }
     const request = {
       id: nextId("signup", state.signupRequests || []),
@@ -255,7 +255,8 @@
   function getPostCompletion(state, postId) {
     const post = state.posts.find((item) => item.id === postId) || {};
     const targets = post.targetUserIds && post.targetUserIds.length ? post.targetUserIds : memberIds;
-    const rules = post.type === "mission" && post.completionRules && post.completionRules.length ? post.completionRules : ["done"];
+    const rules = post.completionRules && post.completionRules.length ? post.completionRules : [];
+    if (!rules.length) return { postId, totalMembers: 0, completedCount: 0, completedUserIds: [], percent: 0 };
     const completedUserIds = targets.filter((userId) => rules.every((rule) => hasCheckpoint(state, postId, userId, rule))).sort();
     return {
       postId,
