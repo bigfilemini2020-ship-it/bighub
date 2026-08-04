@@ -9,6 +9,7 @@ let currentUserId = localStorage.getItem(autoLoginKey) === "1" ? localStorage.ge
 let activeView = "feed";
 let postFilter = "all";
 let editingPostId = "";
+let uploadedAttachment = null;
 
 function loadState() {
   const saved = localStorage.getItem(storeKey);
@@ -153,6 +154,7 @@ function openComposeModal() {
   editingPostId = "";
   const form = byId("postForm");
   form.reset();
+  uploadedAttachment = null;
   byId("composeTitle").textContent = "새 게시물 만들기";
   byId("driveUploadStatus").textContent = "";
   updateMissionSettings();
@@ -188,7 +190,7 @@ function formDataCheckAll(form, name, values) {
   Array.from(form.querySelectorAll(`input[name='${name}']`)).forEach((input) => { input.checked = selected.has(input.value); });
 }
 
-function closeComposeModal() { byId("composeModal").classList.add("hidden"); editingPostId = ""; }
+function closeComposeModal() { byId("composeModal").classList.add("hidden"); editingPostId = ""; uploadedAttachment = null; }
 function formatFileSize(bytes) {
   const size = Number(bytes) || 0;
   if (size < 1024) return `${size}B`;
@@ -196,11 +198,23 @@ function formatFileSize(bytes) {
   if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)}MB`;
   return `${(size / 1024 / 1024 / 1024).toFixed(1)}GB`;
 }
+function driveFileKey(file) {
+  return file ? `${file.name}:${file.size}:${file.lastModified}` : "";
+}
+
 function updateDriveFileStatus() {
   const file = byId("driveFileInput")?.files?.[0];
   const status = byId("driveUploadStatus");
   if (!status) return;
-  status.textContent = file ? `선택됨: ${file.name} (${formatFileSize(file.size)})` : "";
+  if (!file) {
+    uploadedAttachment = null;
+    status.textContent = "";
+    return;
+  }
+  if (uploadedAttachment?.fileKey !== driveFileKey(file)) uploadedAttachment = null;
+  status.textContent = uploadedAttachment
+    ? `업로드 완료: ${uploadedAttachment.name}`
+    : `선택됨: ${file.name} (${formatFileSize(file.size)})`;
 }
 async function authHeaders() {
   if (!remoteAuth()) throw new Error("Supabase 로그인이 필요합니다.");
@@ -342,13 +356,18 @@ function bindForms() {
     const submitButton = form.querySelector("button[type='submit']");
     try {
       if (file) {
-        setUploadStatus("Drive 업로드 준비 중...", 5);
         if (submitButton) submitButton.disabled = true;
-        const uploaded = await uploadDriveFile(file);
-        data.attachmentUrl = uploaded.downloadUrl;
-        data.attachmentName = uploaded.name;
-        data.attachmentMimeType = uploaded.mimeType;
-        setUploadStatus("업로드 완료", 100);
+        if (!uploadedAttachment || uploadedAttachment.fileKey !== driveFileKey(file)) {
+          setUploadStatus("Drive 업로드 준비 중...", 5);
+          const uploaded = await uploadDriveFile(file);
+          uploadedAttachment = { ...uploaded, fileKey: driveFileKey(file) };
+          setUploadStatus("업로드 완료", 100);
+        } else {
+          setUploadStatus("이미 업로드된 파일 연결 중...", 100);
+        }
+        data.attachmentUrl = uploadedAttachment.downloadUrl;
+        data.attachmentName = uploadedAttachment.name;
+        data.attachmentMimeType = uploadedAttachment.mimeType;
       }
       delete data.driveFile;
       data.targetUserIds = data.type === "mission" ? formData.getAll("targetUserIds") : [];
