@@ -30,13 +30,22 @@ function user(userId) { return state.users.find((item) => item.id === userId) ||
 function userName(userId) { return user(userId).name; }
 function currentUser() { return state.users.find((item) => item.id === currentUserId) || null; }
 function isImageAvatar(value) { return /^(data:image\/|https?:\/\/)/.test(String(value || "")); }
+function departmentAvatarClass(department) {
+  const key = String(department || "");
+  if (key === "\uAC1C\uBC1C") return "avatar-team-dev";
+  if (key === "\uC6B4\uC601") return "avatar-team-ops";
+  if (key === "\uB9C8\uCF00\uD305") return "avatar-team-marketing";
+  if (key === "\uACBD\uC601\uC9C0\uC6D0") return "avatar-team-support";
+  if (key === "\uC784\uC6D0") return "avatar-team-exec";
+  return "avatar-team-etc";
+}
 function avatarMarkup(item, className = "avatar") {
   const target = item || {};
   const label = escapeHtml(target.name || "\uC0AC\uC6A9\uC790");
   const value = target.avatar || "";
   if (isImageAvatar(value)) return `<span class="${className} image-avatar" aria-label="${label}" title="${label}"><img src="${escapeHtml(value)}" alt="" /></span>`;
   if (target.role === "admin") return `<span class="${className} admin-icon" aria-label="${label}" title="${label}"></span>`;
-  return `<span class="${className}" aria-label="${label}" title="${label}">${escapeHtml(value || String(target.name || "?").slice(0, 1))}</span>`;
+  return `<span class="${className} ${departmentAvatarClass(target.department)}" aria-label="${label}" title="${label}">${escapeHtml(value || String(target.name || "?").slice(0, 1))}</span>`;
 }
 function avatarHtml(userId) { return avatarMarkup(user(userId), "avatar"); }
 function linkHtml(url, label) { return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${label}</a>` : ""; }
@@ -602,7 +611,7 @@ function renderCurrentUser() {
   const item = currentUser();
   const avatar = byId("currentAvatar");
   if (avatar && item) {
-    avatar.className = `avatar current avatar-picker${isImageAvatar(item.avatar) ? " image-avatar" : ""}${!isImageAvatar(item.avatar) && item.role === "admin" ? " admin-icon" : ""}`;
+    avatar.className = `avatar current avatar-picker${isImageAvatar(item.avatar) ? " image-avatar" : ""}${!isImageAvatar(item.avatar) && item.role === "admin" ? " admin-icon" : ""}${!isImageAvatar(item.avatar) && item.role !== "admin" ? ` ${departmentAvatarClass(item.department)}` : ""}`;
     avatar.innerHTML = isImageAvatar(item.avatar) ? `<img src="${escapeHtml(item.avatar)}" alt="" />` : (item.role === "admin" ? "" : escapeHtml(item.avatar || item.name.slice(0, 1)));
     avatar.setAttribute("aria-label", "\uD504\uB85C\uD544 \uC0AC\uC9C4 \uBCC0\uACBD");
     avatar.setAttribute("title", "\uD504\uB85C\uD544 \uC0AC\uC9C4 \uBCC0\uACBD");
