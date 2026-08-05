@@ -214,8 +214,11 @@
   }
 
   async function deletePost(id) {
-    const { error } = await client().from("posts").delete().eq("id", id);
+    const { data, error } = await client().from("posts").delete().eq("id", id).select("id");
     if (error) throw new Error(userMessage(error, "게시글 삭제에 실패했습니다."));
+    if (!data || data.length === 0) {
+      throw new Error("게시글 삭제 권한이 없거나 이미 삭제된 글입니다. 관리자 계정이라면 Supabase SQL의 posts 삭제 정책을 다시 실행해주세요.");
+    }
   }
 
   async function addReaction(input) {

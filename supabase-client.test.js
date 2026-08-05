@@ -112,3 +112,48 @@ test("signIn translates invalid credentials in Korean", async () => {
     /아이디 또는 비밀번호/
   );
 });
+test("deletePost verifies that a row was actually deleted", async () => {
+  let selected = false;
+  const fakeClient = {
+    from(table) {
+      assert.equal(table, "posts");
+      return {
+        delete: () => ({
+          eq: (column, value) => {
+            assert.equal(column, "id");
+            assert.equal(value, "post-1");
+            return {
+              select: async (fields) => {
+                selected = true;
+                assert.equal(fields, "id");
+                return { data: [{ id: "post-1" }], error: null };
+              },
+            };
+          },
+        }),
+      };
+    },
+  };
+
+  await loadClient(fakeClient).deletePost("post-1");
+  assert.equal(selected, true);
+});
+
+test("deletePost reports zero deleted rows as a permission problem", async () => {
+  const fakeClient = {
+    from() {
+      return {
+        delete: () => ({
+          eq: () => ({
+            select: async () => ({ data: [], error: null }),
+          }),
+        }),
+      };
+    },
+  };
+
+  await assert.rejects(
+    () => loadClient(fakeClient).deletePost("post-1"),
+    /Supabase SQL|posts/
+  );
+});
