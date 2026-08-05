@@ -822,7 +822,7 @@ function postCardHtml(post) {
   const doneAction = completionEnabled ? actionButton(post.id, "done", mine, "check", doneLabel) : "";
   const commentAction = `<button class="icon-action comment${commentsOpen ? " active" : ""}" data-action="toggle-comments" data-post-id="${escapeHtml(post.id)}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글 ${comments.length}</span></button>`;
   const completionAvatars = completionEnabled ? completionAvatarStack(completion.completedUserIds) : "";
-  const actions = `<div class="feed-actions">${doneAction}${completionAvatars}${commentAction}${saveControlHtml(post)}</div>`;
+  const actions = `<div class="feed-actions">${commentAction}${doneAction}${completionAvatars}${saveControlHtml(post)}</div>`;
   const commentsPanel = commentsOpen ? `<div class="comments-panel">${comments.length ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form></div>` : "";
   const header = `<header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${menuButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>`;
   if (collapsed) {

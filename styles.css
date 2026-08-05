@@ -2054,3 +2054,53 @@ textarea {
   margin-top: 12px;
   padding-top: 12px;
 }
+
+
+/* Feed action row alignment */
+.feed-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+}
+
+.feed-actions .icon-action,
+.feed-actions .save-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.feed-actions .icon-action span {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.feed-actions .completion-avatars {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  flex: 0 0 auto;
+  margin: 0 0 0 -2px;
+}
+
+.feed-actions .completion-avatar {
+  align-self: center;
+  flex: 0 0 30px;
+}
+
+
+.feed-actions .save-link {
+  margin-left: 0;
+  width: 42px;
+  color: var(--text);
+}
+
+.feed-actions .save-link:empty {
+  display: none;
+}
