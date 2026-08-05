@@ -1893,7 +1893,7 @@ textarea {
   color: #334155;
 }
 
-/* Keep circular avatars clear of text-card crop and timeline border. */
+/* Keep text-card avatars and body aligned without timeline clipping. */
 .text-card,
 .text-card .feed-head,
 .text-card .author-line,
@@ -1903,11 +1903,14 @@ textarea {
 }
 
 .text-card .feed-head {
-  padding-left: 22px;
+  padding-left: 24px;
+  padding-right: 18px;
 }
 
 .text-card .feed-body {
-  margin-left: 62px;
+  margin-left: 0;
+  border-left: 0;
+  padding: 0 18px 18px 76px;
 }
 
 .completion-avatar {
