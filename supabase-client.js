@@ -17,9 +17,25 @@
     return [error?.message, error?.details, error?.hint, error?.code].filter(Boolean).join(" / ");
   }
 
+  function isFetchFailure(error) {
+    const text = rawErrorDetail(error).toLowerCase();
+    return text.includes("failed to fetch") || text.includes("networkerror") || text.includes("load failed");
+  }
+
+  async function withNetworkRetry(task) {
+    try {
+      return await task();
+    } catch (error) {
+      if (!isFetchFailure(error)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      return task();
+    }
+  }
+
   function userMessage(error, fallback) {
     const text = String(error?.message || error || "").toLowerCase();
     const code = String(error?.code || "").toLowerCase();
+    if (isFetchFailure(error)) return "네트워크 연결이 불안정해서 저장하지 못했습니다. 잠시 후 다시 시도해주세요.";
     if (text.includes("login id is invalid") || text.includes("아이디는")) return "아이디는 영문 소문자, 숫자, 점, 밑줄, 하이픈으로 2~32자 입력하세요.";
     if (text.includes("already registered") || text.includes("already exists") || text.includes("duplicate key")) {
       return "이미 가입 신청된 아이디입니다. 관리자 승인 후 로그인하세요.";
@@ -235,8 +251,13 @@
   }
 
   async function addComment(input) {
-    const { error } = await client().from("comments").insert({ post_id: input.postId, user_id: input.userId, parent_id: input.parentId || null, body: input.body });
-    if (error) throw new Error(userMessage(error, "댓글 저장에 실패했습니다."));
+    let response;
+    try {
+      response = await withNetworkRetry(() => client().from("comments").insert({ post_id: input.postId, user_id: input.userId, parent_id: input.parentId || null, body: input.body }));
+    } catch (error) {
+      throw new Error(userMessage(error, "댓글 저장에 실패했습니다."));
+    }
+    if (response.error) throw new Error(userMessage(response.error, "댓글 저장에 실패했습니다."));
   }
 
   async function deleteComment(id) {

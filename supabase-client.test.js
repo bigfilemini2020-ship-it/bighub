@@ -12,7 +12,7 @@ function loadClient(fakeClient) {
     },
     supabase: { createClient: () => fakeClient },
   };
-  vm.runInNewContext(readFileSync("supabase-client.js", "utf8"), { window });
+  vm.runInNewContext(readFileSync("supabase-client.js", "utf8"), { window, setTimeout });
   return window.BigHubSupabase;
 }
 
@@ -155,5 +155,40 @@ test("deletePost reports zero deleted rows as a permission problem", async () =>
   await assert.rejects(
     () => loadClient(fakeClient).deletePost("post-1"),
     /Supabase SQL|posts/
+  );
+});
+
+test("addComment retries transient fetch failures", async () => {
+  let attempts = 0;
+  const fakeClient = {
+    from(table) {
+      assert.equal(table, "comments");
+      return {
+        insert: async (row) => {
+          attempts += 1;
+          assert.equal(row.post_id, "post-1");
+          if (attempts === 1) throw new TypeError("Failed to fetch");
+          return { error: null };
+        },
+      };
+    },
+  };
+
+  await loadClient(fakeClient).addComment({ postId: "post-1", userId: "user-1", body: "test" });
+  assert.equal(attempts, 2);
+});
+
+test("addComment translates repeated fetch failures", async () => {
+  const fakeClient = {
+    from() {
+      return {
+        insert: async () => { throw new TypeError("Failed to fetch"); },
+      };
+    },
+  };
+
+  await assert.rejects(
+    () => loadClient(fakeClient).addComment({ postId: "post-1", userId: "user-1", body: "test" }),
+    /네트워크 연결이 불안정/
   );
 });
