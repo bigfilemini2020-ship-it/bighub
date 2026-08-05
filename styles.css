@@ -626,10 +626,9 @@ textarea {
 }
 
 .text-card .feed-body {
-  margin-left: 62px;
-  padding-top: 0;
-  border-left: 2px solid var(--line);
-  padding-left: 16px;
+  margin-left: 0;
+  padding: 0 18px 18px 76px;
+  border-left: 0;
 }
 
 .text-card .feed-body h3 {
@@ -1301,13 +1300,13 @@ textarea {
 }
 
 .text-card {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .text-card .feed-body {
-  margin-left: 52px;
-  border-left: 1px solid #e5e7eb;
-  padding: 0 14px 16px 16px;
+  margin-left: 0;
+  padding: 0 18px 18px 76px;
+  border-left: 0;
 }
 
 .text-card .feed-body h3 {
