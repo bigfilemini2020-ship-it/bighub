@@ -20,6 +20,7 @@ let desktopSettings = null;
 let desktopNotificationsArmed = false;
 let desktopUpdateInfo = null;
 let desktopUpdateChecking = false;
+const notificationPollIntervalMs = 10000;
 let expandedPostIds = new Set();
 let openCommentPostIds = new Set();
 
@@ -108,9 +109,20 @@ async function installDesktopUpdate() {
     updateDesktopUpdateStatus(error.message || "업데이트 설치에 실패했습니다.", false);
   }
 }
+async function requestBrowserNotificationPermission() {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") return true;
+  if (Notification.permission === "denied") return false;
+  try { return (await Notification.requestPermission()) === "granted"; } catch { return false; }
+}
 async function notifyDesktop(title, body) {
-  if (!isDesktopApp() || !desktopSettings?.notificationsEnabled) return;
-  try { await desktopInvoke("notify_desktop", { title, body }); } catch (error) { console.warn(error); }
+  if (!desktopSettings?.notificationsEnabled) return;
+  if (isDesktopApp()) {
+    try { await desktopInvoke("notify_desktop", { title, body }); return; } catch (error) { console.warn(error); }
+  }
+  if (await requestBrowserNotificationPermission()) {
+    new Notification(title, { body, icon: "icons/icon.png" });
+  }
 }
 function notifyForRemoteChanges(beforePostIds, beforeCommentIds) {
   if (!desktopSettings?.notificationsEnabled) return;
@@ -410,7 +422,7 @@ function bindNavigation() {
   window.addEventListener("beforeunload", saveFeedPosition);
   window.addEventListener("focus", syncRemoteData);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) syncRemoteData(); });
-  window.setInterval(syncRemoteData, 30000);
+  window.setInterval(syncRemoteData, notificationPollIntervalMs);
   byId("globalSearch").addEventListener("input", renderSearch);
   byId("logoutButton").addEventListener("click", async () => { if (remoteAuth()) await window.BigHubSupabase.signOut(); currentUserId = ""; clearSession(); render(); });
   byId("currentAvatar")?.addEventListener("click", () => byId("avatarFileInput")?.click());
@@ -440,6 +452,9 @@ function bindDesktopSettings() {
       try {
         await setDesktopSetting(input.dataset.desktopSetting, input.checked);
         renderDesktopSettings();
+        if (input.dataset.desktopSetting === "notificationsEnabled" && input.checked) {
+          await notifyDesktop("BigHub \uC54C\uB9BC", "\uC0C8 \uAE00\uACFC \uB313\uAE00 \uC54C\uB9BC\uC774 \uCF1C\uC84C\uC2B5\uB2C8\uB2E4.");
+        }
         if (status) status.textContent = "\uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
       } catch (error) {
         input.checked = !input.checked;

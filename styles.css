@@ -2157,3 +2157,66 @@ textarea {
   background: #f5f8ff;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10) inset;
 }
+
+
+/* Feed action controls: keep icons, labels, avatars, and download aligned */
+.feed-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+}
+
+.feed-actions .icon-action,
+.feed-actions .save-link {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  min-height: 42px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.feed-actions .icon-action {
+  gap: 7px;
+  padding: 0 10px;
+}
+
+.feed-actions .icon-action svg,
+.feed-actions .save-link svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.feed-actions .icon-action span {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  line-height: 1;
+}
+
+.feed-actions .completion-avatars {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  height: 42px;
+  min-height: 42px;
+  margin: 0 0 0 -4px;
+}
+
+.feed-actions .completion-avatar {
+  align-self: center;
+  flex: 0 0 28px;
+}
+
+.feed-actions .save-link {
+  align-self: center;
+  margin-left: auto;
+  padding: 0;
+  width: 42px;
+}
