@@ -1922,3 +1922,13 @@ textarea {
 .comment-avatar {
   box-sizing: border-box;
 }
+.avatar:not(.image-avatar):not(.admin-icon),
+.completion-avatar:not(.image-avatar):not(.admin-icon),
+.comment-avatar:not(.image-avatar):not(.admin-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1;
+  font-size: 14px;
+}
