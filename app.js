@@ -12,7 +12,7 @@ let currentUserId = localStorage.getItem(autoLoginKey) === "1" ? localStorage.ge
 let activeView = "feed";
 let postFilter = "all";
 let editingPostId = "";
-let uploadedAttachment = null;
+let uploadedAttachments = [];
 let shouldRestoreFeedPosition = true;
 let feedPositionSaveTimer = 0;
 let remoteSyncInFlight = false;
@@ -462,7 +462,7 @@ function openComposeModal() {
   editingPostId = "";
   const form = byId("postForm");
   form.reset();
-  uploadedAttachment = null;
+  uploadedAttachments = [];
   byId("composeTitle").textContent = "새 게시물 만들기";
   byId("driveUploadStatus").textContent = "";
   updateMissionSettings();
@@ -482,11 +482,11 @@ function openEditModal(postId) {
   form.elements.startDate.value = post.startDate || "";
   form.elements.dueDate.value = post.dueDate || "";
   form.elements.mediaUrl.value = post.mediaUrl || "";
-  form.elements.attachmentUrl.value = post.attachmentUrl || "";
+  form.elements.attachmentUrl.value = isAttachmentBundle(post.attachmentUrl) ? "" : post.attachmentUrl || "";
   formDataCheckAll(form, "targetUserIds", post.targetUserIds || []);
   formDataCheckAll(form, "completionRules", post.completionRules || []);
   byId("composeTitle").textContent = "게시물 수정";
-  byId("driveUploadStatus").textContent = post.attachmentName ? `현재 첨부: ${post.attachmentName}` : "";
+  byId("driveUploadStatus").textContent = attachmentList(post).length ? `현재 첨부: ${attachmentList(post).length}개` : "";
   updateMissionSettings();
   byId("composeModal").classList.remove("hidden");
   form.querySelector("input[name='title']").focus();
@@ -498,7 +498,7 @@ function formDataCheckAll(form, name, values) {
   Array.from(form.querySelectorAll(`input[name='${name}']`)).forEach((input) => { input.checked = selected.has(input.value); });
 }
 
-function closeComposeModal() { byId("composeModal").classList.add("hidden"); editingPostId = ""; uploadedAttachment = null; }
+function closeComposeModal() { byId("composeModal").classList.add("hidden"); editingPostId = ""; uploadedAttachments = []; }
 function formatFileSize(bytes) {
   const size = Number(bytes) || 0;
   if (size < 1024) return `${size}B`;
@@ -510,44 +510,60 @@ function driveFileKey(file) {
   return file ? `${file.name}:${file.size}:${file.lastModified}` : "";
 }
 
-function loadUploadedAttachment(file) {
-  const key = driveFileKey(file);
-  if (!key) return null;
-  if (uploadedAttachment?.fileKey === key) return uploadedAttachment;
+function selectedDriveFiles() {
+  return Array.from(byId("driveFileInput")?.files || []);
+}
+
+function uploadedFileKeys() {
+  return uploadedAttachments.map((item) => item.fileKey).filter(Boolean).join("|");
+}
+
+function selectedFileKeys(files) {
+  return files.map(driveFileKey).filter(Boolean).join("|");
+}
+
+function hasUploadedSelectedFiles(files) {
+  return files.length > 0 && uploadedAttachments.length === files.length && uploadedFileKeys() === selectedFileKeys(files);
+}
+
+function rememberUploadedAttachments(values) {
+  uploadedAttachments = values;
+  if (values.length) sessionStorage.setItem(uploadedAttachmentKey, JSON.stringify(values));
+}
+
+function loadUploadedAttachments(files) {
+  if (!files.length) return [];
+  if (hasUploadedSelectedFiles(files)) return uploadedAttachments;
   try {
-    const cached = JSON.parse(sessionStorage.getItem(uploadedAttachmentKey) || "null");
-    if (cached?.fileKey === key && cached.downloadUrl) {
-      uploadedAttachment = cached;
+    const cached = JSON.parse(sessionStorage.getItem(uploadedAttachmentKey) || "[]");
+    if (Array.isArray(cached) && cached.length === files.length && cached.map((item) => item.fileKey).join("|") === selectedFileKeys(files)) {
+      uploadedAttachments = cached;
       return cached;
     }
   } catch {}
-  return null;
+  return [];
 }
 
-function rememberUploadedAttachment(value) {
-  uploadedAttachment = value;
-  if (value?.downloadUrl) sessionStorage.setItem(uploadedAttachmentKey, JSON.stringify(value));
-}
-
-function clearUploadedAttachment() {
-  uploadedAttachment = null;
+function clearUploadedAttachments() {
+  uploadedAttachments = [];
   sessionStorage.removeItem(uploadedAttachmentKey);
 }
 
 function updateDriveFileStatus() {
-  const file = byId("driveFileInput")?.files?.[0];
+  const files = selectedDriveFiles();
   const status = byId("driveUploadStatus");
   if (!status) return;
-  if (!file) {
-    clearUploadedAttachment();
+  if (!files.length) {
+    clearUploadedAttachments();
     status.textContent = "";
     return;
   }
-  loadUploadedAttachment(file);
-  if (uploadedAttachment?.fileKey !== driveFileKey(file)) uploadedAttachment = null;
-  status.textContent = uploadedAttachment
-    ? `업로드 완료: ${uploadedAttachment.name}`
-    : `선택됨: ${file.name} (${formatFileSize(file.size)})`;
+  loadUploadedAttachments(files);
+  if (!hasUploadedSelectedFiles(files)) uploadedAttachments = [];
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+  status.textContent = hasUploadedSelectedFiles(files)
+    ? `업로드 완료: ${files.length}개 파일`
+    : `선택됨: ${files.length}개 파일 (${formatFileSize(totalSize)})`;
 }
 async function authHeaders() {
   if (!remoteAuth()) throw new Error("Supabase 로그인이 필요합니다.");
@@ -652,36 +668,88 @@ function driveFileName(url) {
   try { return new URL(url, location.href).searchParams.get("name") || "Drive 파일"; } catch { return "Drive 파일"; }
 }
 
+function isAttachmentBundle(value) {
+  const raw = String(value || "").trim();
+  return raw.startsWith("[");
+}
 
-function isVideoAttachment(post) {
-  const mime = String(post.attachmentMimeType || "").toLowerCase();
-  const name = String(post.attachmentName || driveFileName(post.attachmentUrl)).toLowerCase();
+function normalizeAttachment(item) {
+  const url = String(item?.url || item?.downloadUrl || "").trim();
+  return {
+    url,
+    name: String(item?.name || driveFileName(url)).trim(),
+    mimeType: String(item?.mimeType || item?.attachmentMimeType || "").trim(),
+  };
+}
+
+function attachmentList(post) {
+  const raw = String(post?.attachmentUrl || "").trim();
+  if (!raw) return [];
+  if (isAttachmentBundle(raw) || post.attachmentMimeType === "application/vnd.bighub.attachments+json") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map(normalizeAttachment).filter((item) => item.url);
+    } catch {}
+  }
+  return [normalizeAttachment({ url: raw, name: post.attachmentName || driveFileName(raw), mimeType: post.attachmentMimeType || "" })];
+}
+
+function attachmentPayload(attachments) {
+  const list = attachments.map(normalizeAttachment).filter((item) => item.url);
+  if (!list.length) return { attachmentUrl: "", attachmentName: "", attachmentMimeType: "" };
+  if (list.length === 1) return { attachmentUrl: list[0].url, attachmentName: list[0].name, attachmentMimeType: list[0].mimeType };
+  return { attachmentUrl: JSON.stringify(list), attachmentName: `${list.length}개 파일`, attachmentMimeType: "application/vnd.bighub.attachments+json" };
+}
+
+function isVideoFile(item) {
+  const mime = String(item?.mimeType || "").toLowerCase();
+  const name = String(item?.name || driveFileName(item?.url)).toLowerCase();
   return mime.startsWith("video/") || /\.(mp4|mov|m4v|webm)(\?.*)?$/.test(name);
 }
 
-function isImageAttachment(post) {
-  const mime = String(post.attachmentMimeType || "").toLowerCase();
-  const name = String(post.attachmentName || driveFileName(post.attachmentUrl)).toLowerCase();
+function isImageFile(item) {
+  const mime = String(item?.mimeType || "").toLowerCase();
+  const name = String(item?.name || driveFileName(item?.url)).toLowerCase();
   return mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/.test(name);
 }
 
-function attachmentHtml(post) {
-  if (!post.attachmentUrl) return "";
-  if (isDriveDownloadUrl(post.attachmentUrl)) {
-    if (isVideoAttachment(post) || isImageAttachment(post)) return "";
-    const name = post.attachmentName || driveFileName(post.attachmentUrl);
-    return `<div class="attachment-line drive-attachment"><span>${escapeHtml(name)}</span></div>`;
-  }
-  return `<div class="attachment-line">${linkHtml(post.attachmentUrl, "첨부파일 열기")}</div>`;
+function representativeAttachment(post) {
+  return attachmentList(post).find((item) => isVideoFile(item) || isImageFile(item)) || null;
 }
 
+function isVideoAttachment(post, attachment = null) {
+  return isVideoFile(attachment || representativeAttachment(post) || attachmentList(post)[0]);
+}
+
+function isImageAttachment(post, attachment = null) {
+  return isImageFile(attachment || representativeAttachment(post) || attachmentList(post)[0]);
+}
+
+function attachmentHtml(post) {
+  const representative = representativeAttachment(post);
+  const attachments = attachmentList(post).filter((item) => item.url !== representative?.url);
+  if (!attachments.length) return "";
+  return `<div class="attachment-list">${attachments.map((item) => attachmentRowHtml(post.id, item)).join("")}</div>`;
+}
+
+function attachmentRowHtml(postId, item) {
+  const label = isVideoFile(item) ? "영상" : isImageFile(item) ? "이미지" : "첨부";
+  const safeUrl = escapeHtml(item.url);
+  const button = isDriveDownloadUrl(item.url)
+    ? `<button class="attachment-download" data-action="download-file" data-post-id="${postId}" data-url="${safeUrl}" type="button" title="다운로드" aria-label="다운로드">${iconSvg("download")}</button>`
+    : `<a class="attachment-download" href="${safeUrl}" target="_blank" rel="noreferrer" data-action="download-file" data-post-id="${postId}" data-url="${safeUrl}" title="열기" aria-label="열기">${iconSvg("download")}</a>`;
+  return `<div class="attachment-line drive-attachment"><span><strong>${escapeHtml(label)}</strong>${escapeHtml(item.name)}</span>${button}</div>`;
+}
 
 function saveControlHtml(post) {
-  if (!post.attachmentUrl) return "";
-  if (isDriveDownloadUrl(post.attachmentUrl)) {
-    return `<button class="save-link" data-action="download-file" data-post-id="${post.id}" data-url="${escapeHtml(post.attachmentUrl)}" type="button" title="다운로드" aria-label="다운로드">${iconSvg("download")}</button>`;
+  const attachments = attachmentList(post);
+  if (!attachments.length) return "";
+  const item = representativeAttachment(post) || attachments[0];
+  const safeUrl = escapeHtml(item.url);
+  if (isDriveDownloadUrl(item.url)) {
+    return `<button class="save-link" data-action="download-file" data-post-id="${post.id}" data-url="${safeUrl}" type="button" title="다운로드" aria-label="다운로드">${iconSvg("download")}</button>`;
   }
-  return `<a class="save-link" href="${escapeHtml(post.attachmentUrl)}" target="_blank" rel="noreferrer" title="저장/열기" data-action="download-file" data-post-id="${post.id}" data-url="${escapeHtml(post.attachmentUrl)}">${iconSvg("download")}</a>`;
+  return `<a class="save-link" href="${safeUrl}" target="_blank" rel="noreferrer" title="열기" data-action="download-file" data-post-id="${post.id}" data-url="${safeUrl}">${iconSvg("download")}</a>`;
 }
 function updateMissionSettings() {
   const type = byId("postTypeSelect")?.value;
@@ -699,25 +767,34 @@ function bindForms() {
     const form = event.currentTarget;
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
-    const file = byId("driveFileInput")?.files?.[0];
+    const files = selectedDriveFiles();
     const status = byId("driveUploadStatus");
     const submitButton = form.querySelector("button[type='submit']");
     try {
-      if (file) {
+      const manualAttachmentUrl = String(data.attachmentUrl || "").trim();
+      const uploadedFileAttachments = [];
+      if (files.length) {
         if (submitButton) submitButton.disabled = true;
-        const cachedUpload = loadUploadedAttachment(file);
-        if (!cachedUpload) {
-          setUploadStatus("Drive 업로드 준비 중...", 5);
-          const uploaded = await uploadDriveFile(file);
-          rememberUploadedAttachment({ ...uploaded, fileKey: driveFileKey(file) });
+        if (!hasUploadedSelectedFiles(files)) {
+          const uploaded = [];
+          for (let index = 0; index < files.length; index += 1) {
+            const file = files[index];
+            setUploadStatus(`Drive 업로드 중... ${index + 1}/${files.length}`, Math.round((index / files.length) * 100));
+            const result = await uploadDriveFile(file);
+            uploaded.push({ ...result, fileKey: driveFileKey(file) });
+          }
+          rememberUploadedAttachments(uploaded);
           setUploadStatus("업로드 완료", 100);
         } else {
           setUploadStatus("이미 업로드된 파일 연결 중...", 100);
         }
-        data.attachmentUrl = uploadedAttachment.downloadUrl;
-        data.attachmentName = uploadedAttachment.name;
-        data.attachmentMimeType = uploadedAttachment.mimeType;
+        uploadedFileAttachments.push(...uploadedAttachments.map((item) => ({ url: item.downloadUrl, name: item.name, mimeType: item.mimeType })));
       }
+      const manualAttachments = manualAttachmentUrl ? [{ url: manualAttachmentUrl, name: driveFileName(manualAttachmentUrl), mimeType: "" }] : [];
+      const existingPost = editingPostId ? state.posts.find((post) => post.id === editingPostId) : null;
+      const nextAttachments = [...uploadedFileAttachments, ...manualAttachments];
+      if (nextAttachments.length) Object.assign(data, attachmentPayload(nextAttachments));
+      else if (existingPost) Object.assign(data, attachmentPayload(attachmentList(existingPost)));
       delete data.driveFile;
       data.targetUserIds = data.type === "mission" ? formData.getAll("targetUserIds") : [];
       data.completionRules = formData.getAll("completionRules");
@@ -731,7 +808,7 @@ function bindForms() {
         saveState();
       }
       form.reset();
-      clearUploadedAttachment();
+      clearUploadedAttachments();
       setUploadStatus("");
       closeComposeModal();
       activeView = "feed";
@@ -810,13 +887,13 @@ function postCardHtml(post) {
   const mine = reactions.filter((reaction) => reaction.userId === currentUserId);
   const userDone = mine.some((reaction) => reaction.sticker === "done");
   const doneCount = completionEnabled ? completion.completedCount : reactions.filter((reaction) => reaction.sticker === "done").length;
-  const mediaUrl = post.mediaUrl || post.videoUrl || post.attachmentUrl;
+  const mediaUrl = post.mediaUrl || post.videoUrl || representativeAttachment(post)?.url || "";
   const presentation = S.getPostPresentation(post);
   const baseClass = presentation.kind === "text" ? "feed-card text-card" : "feed-card media-card";
   const collapsed = completionEnabled && userDone && !expandedPostIds.has(post.id);
   const commentsOpen = openCommentPostIds.has(post.id);
   const cardClass = collapsed ? `${baseClass} collapsed-card` : baseClass;
-  const preview = !collapsed && presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post) : "";
+  const preview = !collapsed && mediaUrl && presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post) : "";
   const menuButton = canManagePost(post) ? postMenuHtml(post.id) : "";
   const doneLabel = post.type === "mission" ? `완료 ${doneCount}/${completion.totalMembers}` : `완료 ${doneCount}`;
   const doneAction = completionEnabled ? actionButton(post.id, "done", mine, "check", doneLabel) : "";
@@ -848,10 +925,11 @@ function postMenuHtml(postId) {
 function actionButton(postId, sticker, mine, icon, label) { const active = mine.some((reaction) => reaction.sticker === sticker) ? " active" : ""; return `<button class="icon-action ${sticker}${active}" data-action="reaction" data-post-id="${postId}" data-sticker="${sticker}" type="button" title="${label}" aria-label="${label}">${iconSvg(icon)}<span>${label}</span></button>`; }
 function iconSvg(name) { const icons = { heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.2-4.4-9.5-9.1C.7 8.2 2.9 4.5 6.7 4.5c2 0 3.7 1.1 4.7 2.7 1-1.6 2.7-2.7 4.7-2.7 3.8 0 6 3.7 4.2 7.4C19.2 16.6 12 21 12 21Z"/></svg>`, check: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`, comment: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.4 9.6 9.6 0 0 1-4-.8L3 20l1.1-4.4A8.1 8.1 0 0 1 3 11.5C3 6.8 7 3 12 3s9 3.8 9 8.5Z"/></svg>`, download: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>`, more: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>` }; return icons[name] || name; }
 function mediaPreviewHtml(url, post) {
-  if (isDriveDownloadUrl(url) && isVideoAttachment(post)) {
+  const attachment = attachmentList(post).find((item) => item.url === url) || null;
+  if (isDriveDownloadUrl(url) && isVideoAttachment(post, attachment)) {
     return `<div class="media-preview video-preview"><video class="drive-video" controls preload="metadata" playsinline data-drive-src="${escapeHtml(`${url}&inline=1`)}"></video></div>`;
   }
-  if (isDriveDownloadUrl(url) && isImageAttachment(post)) {
+  if (isDriveDownloadUrl(url) && isImageAttachment(post, attachment)) {
     return `<div class="media-preview image-preview"><img class="drive-image" data-drive-src="${escapeHtml(`${url}&inline=1`)}" alt="${escapeHtml(post.title)}" loading="lazy" /></div>`;
   }
   const preview = S.getLinkPreview(url);

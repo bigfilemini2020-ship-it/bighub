@@ -2096,11 +2096,58 @@ textarea {
 
 
 .feed-actions .save-link {
-  margin-left: 0;
+  margin-left: auto;
   width: 42px;
   color: var(--text);
 }
 
 .feed-actions .save-link:empty {
   display: none;
+}
+
+.attachment-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.attachment-list .drive-attachment {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.attachment-list .drive-attachment span {
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-list .drive-attachment strong {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.attachment-download {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  text-decoration: none;
+}
+
+.attachment-download svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
 }
