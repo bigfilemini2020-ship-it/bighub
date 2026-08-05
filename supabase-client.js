@@ -13,6 +13,10 @@
     return root.supabase.createClient(item.supabaseUrl, item.supabaseAnonKey);
   }
 
+  function rawErrorDetail(error) {
+    return [error?.message, error?.details, error?.hint, error?.code].filter(Boolean).join(" / ");
+  }
+
   function userMessage(error, fallback) {
     const text = String(error?.message || error || "").toLowerCase();
     const code = String(error?.code || "").toLowerCase();
@@ -30,7 +34,8 @@
     }
     if (code === "pgrst116" || text.includes("json object requested")) return "가입 신청 정보가 아직 생성되지 않았습니다. 관리자에게 Supabase SQL 업데이트를 요청하세요.";
     if (text.includes("column") && text.includes("attachment")) return "첨부파일 저장 컬럼이 없습니다. Supabase SQL 업데이트를 다시 실행하세요.";
-    return fallback || "요청 처리 중 오류가 발생했습니다. 잠시 후 다시 시도하세요.";
+    const detail = rawErrorDetail(error);
+    return detail && fallback ? `${fallback} (${detail})` : fallback || detail || "Request failed. Please try again.";
   }
 
   function toUser(profile) {
