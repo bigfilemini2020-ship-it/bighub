@@ -666,6 +666,7 @@ function isImageAttachment(post) {
 function attachmentHtml(post) {
   if (!post.attachmentUrl) return "";
   if (isDriveDownloadUrl(post.attachmentUrl)) {
+    if (isVideoAttachment(post) || isImageAttachment(post)) return "";
     const name = post.attachmentName || driveFileName(post.attachmentUrl);
     return `<div class="attachment-line drive-attachment"><span>${escapeHtml(name)}</span></div>`;
   }
