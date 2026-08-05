@@ -553,7 +553,7 @@ function postCardHtml(post) {
   const reactions = state.reactions.filter((reaction) => reaction.postId === post.id);
   const comments = state.comments.filter((comment) => comment.postId === post.id);
   const mine = reactions.filter((reaction) => reaction.userId === currentUserId);
-  const doneCount = reactions.filter((reaction) => reaction.sticker === "done").length;
+  const doneCount = completionEnabled ? completion.completedCount : reactions.filter((reaction) => reaction.sticker === "done").length;
   const mediaUrl = post.mediaUrl || post.videoUrl || post.attachmentUrl;
   const presentation = S.getPostPresentation(post);
   const cardClass = presentation.kind === "text" ? "feed-card text-card" : "feed-card media-card";
@@ -561,8 +561,23 @@ function postCardHtml(post) {
   const menuButton = canManagePost(post) ? postMenuHtml(post.id) : "";
   const doneLabel = post.type === "mission" ? `완료 ${doneCount}/${completion.totalMembers}` : `완료 ${doneCount}`;
   const doneAction = completionEnabled ? actionButton(post.id, "done", mine, "check", doneLabel) : "";
-  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${menuButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<div class="feed-actions">${doneAction}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글 ${comments.length}</span></button>${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form></section></article>`;
+  const completionAvatars = completionEnabled ? completionAvatarStack(completion.completedUserIds) : "";
+  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${menuButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<div class="feed-actions">${doneAction}${completionAvatars}${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form></section></article>`;
 }
+function miniAvatarHtml(userId) {
+  const item = user(userId);
+  const label = escapeHtml(item.name);
+  if (item.role === "admin") return `<span class="completion-avatar admin-icon" title="${label}" aria-label="${label}"></span>`;
+  return `<span class="completion-avatar" title="${label}" aria-label="${label}">${escapeHtml(item.avatar || item.name.slice(0, 1))}</span>`;
+}
+
+function completionAvatarStack(userIds = []) {
+  const visible = userIds.slice(0, 5);
+  if (!visible.length) return "";
+  const more = userIds.length > visible.length ? `<span class="completion-avatar more-count">+${userIds.length - visible.length}</span>` : "";
+  return `<div class="completion-avatars" aria-label="completed users">${visible.map(miniAvatarHtml).join("")}${more}</div>`;
+}
+
 function postMenuHtml(postId) {
   return `<div class="post-menu"><button class="post-menu-button" data-action="toggle-post-menu" data-post-id="${postId}" type="button" aria-label="게시글 메뉴">${iconSvg("more")}</button><div class="post-menu-popover hidden" data-menu-for="${postId}"><button data-action="edit-post" data-post-id="${postId}" type="button">수정</button><button class="danger" data-action="delete-post" data-post-id="${postId}" type="button">삭제</button></div></div>`;
 }

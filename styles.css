@@ -868,6 +868,48 @@ textarea {
   background: #f3f6f9;
 }
 
+.completion-avatars {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  margin-left: -4px;
+}
+
+.completion-avatar {
+  width: 28px;
+  height: 28px;
+  margin-left: -8px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.completion-avatar:first-child {
+  margin-left: 0;
+}
+
+.completion-avatar.admin-icon {
+  background-color: #0b1220;
+  background-image: url("assets/bighub-icon.svg");
+  background-position: center;
+  background-size: cover;
+  color: transparent;
+}
+
+.completion-avatar.more-count {
+  background: #0f172a;
+  color: #fff;
+  font-size: 11px;
+}
+
 .text-card {
   border-color: #d9dfe7;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
