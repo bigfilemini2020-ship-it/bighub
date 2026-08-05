@@ -18,6 +18,8 @@ let feedPositionSaveTimer = 0;
 let remoteSyncInFlight = false;
 let desktopSettings = null;
 let desktopNotificationsArmed = false;
+let desktopUpdateInfo = null;
+let desktopUpdateChecking = false;
 
 function loadState() {
   const saved = localStorage.getItem(storeKey);
@@ -58,6 +60,51 @@ async function setDesktopSetting(key, value) {
   desktopSettings = await desktopInvoke("set_desktop_setting", { key, value });
   localStorage.setItem(desktopSettingsKey, JSON.stringify(desktopSettings));
   return desktopSettings;
+}
+function updateDesktopUpdateStatus(text, disabled = false) {
+  const status = byId("desktopUpdateStatus");
+  const button = byId("desktopUpdateButton");
+  if (status && text) status.textContent = text;
+  if (button) button.disabled = disabled;
+}
+
+async function checkDesktopUpdate(options = {}) {
+  if (!isDesktopApp() || desktopUpdateChecking) return null;
+  desktopUpdateChecking = true;
+  if (!options.silent) updateDesktopUpdateStatus("업데이트 확인 중...", true);
+  try {
+    const info = await desktopInvoke("check_desktop_update");
+    desktopUpdateInfo = info;
+    if (info?.available) {
+      const version = info.version || "새 버전";
+      updateDesktopUpdateStatus(`${version} 업데이트가 있습니다.`, false);
+      if (options.silent) {
+        const ok = confirm(`BigHub ${version} 업데이트가 있습니다. 지금 설치할까요?`);
+        if (ok) await installDesktopUpdate();
+      }
+    } else if (!options.silent) {
+      updateDesktopUpdateStatus(`현재 최신 버전입니다. (${info?.currentVersion || "현재 버전"})`, false);
+    }
+    return info;
+  } catch (error) {
+    if (!options.silent) updateDesktopUpdateStatus(error.message || "업데이트 확인에 실패했습니다.", false);
+    return null;
+  } finally {
+    desktopUpdateChecking = false;
+  }
+}
+
+async function installDesktopUpdate() {
+  if (!isDesktopApp()) return;
+  const version = desktopUpdateInfo?.version || "새 버전";
+  const ok = confirm(`BigHub ${version} 업데이트를 설치합니다. 설치 중 앱이 자동으로 종료될 수 있습니다.`);
+  if (!ok) return;
+  updateDesktopUpdateStatus("업데이트 다운로드 및 설치 중...", true);
+  try {
+    await desktopInvoke("install_desktop_update");
+  } catch (error) {
+    updateDesktopUpdateStatus(error.message || "업데이트 설치에 실패했습니다.", false);
+  }
 }
 async function notifyDesktop(title, body) {
   if (!isDesktopApp() || !desktopSettings?.notificationsEnabled) return;
@@ -168,6 +215,7 @@ async function init() {
   bindForms();
   bindDesktopSettings();
   await loadDesktopSettings();
+  setTimeout(() => checkDesktopUpdate({ silent: true }), 2500);
   if (remoteAuth()) await restoreRemoteSession();
   applySavedFeedFilter();
   render();
@@ -374,6 +422,10 @@ function bindNavigation() {
 }
 
 function bindDesktopSettings() {
+  byId("desktopUpdateButton")?.addEventListener("click", async () => {
+    const info = await checkDesktopUpdate();
+    if (info?.available) await installDesktopUpdate();
+  });
   document.querySelectorAll("[data-desktop-setting]").forEach((input) => {
     input.addEventListener("change", async () => {
       const status = byId("desktopSettingsStatus");

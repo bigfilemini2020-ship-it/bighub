@@ -8,3 +8,5 @@ src-tauri/gen/
 .env
 .env.*
 !.env.example
+work/*.key
+work/*.key.pub

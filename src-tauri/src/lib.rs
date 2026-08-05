@@ -7,6 +7,7 @@ use tauri::{
 };
 use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
 use tauri_plugin_notification::NotificationExt;
+use tauri_plugin_updater::UpdaterExt;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +34,16 @@ impl Default for DesktopSettings {
 }
 
 struct SettingsState(Mutex<DesktopSettings>);
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopUpdateInfo {
+    available: bool,
+    current_version: String,
+    version: Option<String>,
+    notes: Option<String>,
+    date: Option<String>,
+}
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app.path().app_config_dir().map_err(|error| error.to_string())?;
@@ -145,6 +156,49 @@ fn set_desktop_setting(
 }
 
 #[tauri::command]
+async fn check_desktop_update(app: AppHandle) -> Result<DesktopUpdateInfo, String> {
+    let updater = app.updater().map_err(|error| error.to_string())?;
+    let current_version = app.package_info().version.to_string();
+    let update = updater.check().await.map_err(|error| error.to_string())?;
+
+    Ok(match update {
+        Some(update) => DesktopUpdateInfo {
+            available: true,
+            current_version: update.current_version,
+            version: Some(update.version),
+            notes: update.body,
+            date: update.date.map(|date| date.to_string()),
+        },
+        None => DesktopUpdateInfo {
+            available: false,
+            current_version,
+            version: None,
+            notes: None,
+            date: None,
+        },
+    })
+}
+
+#[tauri::command]
+async fn install_desktop_update(app: AppHandle) -> Result<(), String> {
+    let Some(update) = app
+        .updater()
+        .map_err(|error| error.to_string())?
+        .check()
+        .await
+        .map_err(|error| error.to_string())?
+    else {
+        return Err("설치할 업데이트가 없습니다.".to_string());
+    };
+
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|error| error.to_string())?;
+    app.restart()
+}
+
+#[tauri::command]
 fn notify_desktop(app: AppHandle, title: String, body: String) -> Result<(), String> {
     app.notification()
         .builder()
@@ -156,6 +210,7 @@ fn notify_desktop(app: AppHandle, title: String, body: String) -> Result<(), Str
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -178,7 +233,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_desktop_settings,
             set_desktop_setting,
-            notify_desktop
+            notify_desktop,
+            check_desktop_update,
+            install_desktop_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running BigHub");
