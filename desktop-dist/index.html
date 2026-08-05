@@ -1,10 +1,154 @@
 <!doctype html>
 <html lang="ko">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BigHub</title>
+    <link rel="icon" type="image/svg+xml" href="assets/bighub-icon.svg" />
+    <link rel="stylesheet" href="styles.css?v=notifications-1" />
   </head>
   <body>
-    BigHub
+    <section id="authView" class="auth-view">
+      <div class="auth-card">
+        <div class="auth-brand"><img class="brand-icon" src="assets/bighub-icon.svg" alt="BigHub" /><div><strong>BigHub</strong><span>빅파일 사내 커뮤니케이션 허브</span></div></div>
+        <div class="auth-panel">
+          <form id="loginForm" class="auth-form">
+            <h1>로그인</h1>
+            <input id="loginIdInput" name="loginId" placeholder="아이디" autocomplete="username" required />
+            <input name="password" type="password" placeholder="비밀번호" autocomplete="current-password" required />
+            <div class="auth-options">
+              <label><input id="rememberId" type="checkbox" /> 아이디 저장</label>
+              <label><input id="autoLogin" type="checkbox" /> 자동 로그인</label>
+            </div>
+            <button type="submit">로그인</button>
+            <p id="loginMessage" class="form-message"></p>
+            <button id="showSignup" class="text-button" type="button">가입 신청</button>
+          </form>
+          <form id="signupForm" class="auth-form hidden">
+            <h1>가입 신청</h1>
+            <input name="loginId" placeholder="아이디" autocomplete="username" required />
+            <input name="name" placeholder="실명" required />
+            <select name="department" required>
+              <option value="">부서 선택</option>
+              <option value="임원">임원</option>
+              <option value="경영지원">경영지원</option>
+              <option value="개발">개발</option>
+              <option value="운영">운영</option>
+              <option value="마케팅">마케팅</option>
+              <option value="기타">기타</option>
+            </select>
+            <input name="password" type="password" placeholder="비밀번호" autocomplete="new-password" required />
+            <input name="passwordConfirm" type="password" placeholder="비밀번호 확인" autocomplete="new-password" required />
+            <button type="submit">가입 신청</button>
+            <p id="signupMessage" class="form-message"></p>
+            <button id="showLogin" class="text-button" type="button">로그인으로 돌아가기</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <div id="appShell" class="app-shell hidden">
+      <aside class="rail expanded" aria-label="주요 메뉴">
+        <div class="rail-brand"><img class="brand-icon small" src="assets/bighub-icon.svg" alt="BigHub" /><strong>BigHub</strong></div>
+        <button class="rail-button active" data-view="feed" type="button"><span>⌂</span><strong>홈</strong></button>
+        <button class="rail-button" data-view="search" type="button"><span>⌕</span><strong>검색</strong></button>
+        <button class="rail-button" data-action="compose-focus" type="button"><span>＋</span><strong>글쓰기</strong></button>
+        <button class="rail-button" data-view="progress" type="button"><span>▤</span><strong>현황</strong></button>
+        <button id="approvalMenuButton" class="rail-button admin-only hidden" data-view="approvals" type="button"><span>✓</span><strong>가입 승인</strong></button>
+        <button id="desktopSettingsButton" class="rail-button hidden" data-view="settings" type="button"><span>⚙</span><strong>설정</strong></button>
+        <button id="resetDemo" class="rail-button rail-bottom" type="button"><span>↺</span><strong>초기화</strong></button>
+      </aside>
+
+      <main class="feed-layout">
+        <section class="feed-column">
+          <header class="mobile-header"><strong>BigHub</strong></header>
+          <section id="feedView" class="view active">
+            <div class="filter-row" role="group" aria-label="피드 필터">
+              <button class="filter-chip active" data-filter="all" type="button">전체</button>
+              <button class="filter-chip" data-filter="notice" type="button">공지</button>
+              <button class="filter-chip" data-filter="general" type="button">일반</button>
+              <button class="filter-chip" data-filter="question" type="button">질문</button>
+              <button class="filter-chip" data-filter="mission" type="button">미션</button>
+            </div>
+            <div id="postList" class="post-stack"></div>
+          </section>
+          <section id="searchView" class="view">
+            <div class="search-panel"><h2>검색</h2><input id="globalSearch" class="search-input" placeholder="게시글, 공지, 미션, 질문 검색" /></div>
+            <div id="searchResults" class="post-stack"></div>
+          </section>
+          <section id="progressView" class="view">
+            <div class="progress-sections"><section><h2>참가자별 확인</h2><div id="userProgress" class="post-stack"></div></section><section><h2>게시물별 확인</h2><div id="postProgress" class="post-stack"></div></section></div>
+          </section>
+          <section id="approvalsView" class="view">
+            <div class="approval-workspace"><div class="panel-title"><strong>가입 승인</strong><span id="approvalViewCount">0</span></div><div id="approvalViewList" class="post-stack"></div></div>
+          </section>
+          <section id="settingsView" class="view">
+            <div class="settings-panel">
+              <header class="settings-head"><h2>설정</h2><p>데스크톱 앱 동작과 알림을 관리합니다.</p></header>
+              <div class="settings-card">
+                <label class="setting-row"><span><strong>닫기 버튼을 누르면 트레이로 내리기</strong><small>꺼두면 창 닫기 버튼으로 앱이 완전히 종료됩니다.</small></span><input type="checkbox" data-desktop-setting="minimizeToTray" /></label>
+                <label class="setting-row"><span><strong>Windows 시작 시 BigHub 켜기</strong><small>PC를 켤 때 백그라운드에서 BigHub를 실행합니다.</small></span><input type="checkbox" data-desktop-setting="autostart" /></label>
+              </div>
+              <div class="settings-card">
+                <label class="setting-row"><span><strong>알림 받기</strong><small>트레이에 내려가 있어도 새 소식을 Windows 알림으로 받습니다.</small></span><input type="checkbox" data-desktop-setting="notificationsEnabled" /></label>
+                <label class="setting-row"><span><strong>새 게시글 알림</strong><small>다른 사람이 게시글을 올리면 알립니다.</small></span><input type="checkbox" data-desktop-setting="notifyPosts" /></label>
+                <label class="setting-row"><span><strong>댓글 알림</strong><small>다른 사람이 댓글을 남기면 알립니다.</small></span><input type="checkbox" data-desktop-setting="notifyComments" /></label>
+                <label class="setting-row"><span><strong>미션 알림</strong><small>미션 게시글이 새로 올라오면 따로 알립니다.</small></span><input type="checkbox" data-desktop-setting="notifyMissions" /></label>
+              </div>
+              <div class="settings-card">
+                <div class="setting-row">
+                  <span><strong>알림 테스트</strong><small id="desktopNotificationStatus">Windows 알림이 뜨는지 바로 확인합니다.</small></span>
+                  <button id="desktopNotificationTestButton" class="mini-button" type="button">알림 테스트</button>
+                </div>
+              </div>
+              <div class="settings-card desktop-update-card">
+                <div class="setting-row">
+                  <span><strong>현재 버전</strong><small id="desktopVersionStatus">버전 확인 중...</small></span>
+                </div>
+                <div class="setting-row">
+                  <span><strong>앱 업데이트</strong><small id="desktopUpdateStatus">새 버전이 있는지 확인합니다.</small></span>
+                  <button id="desktopUpdateButton" class="mini-button" type="button">업데이트 확인</button>
+                </div>
+              </div>
+              <p id="desktopSettingsStatus" class="settings-status"></p>
+            </div>
+          </section>
+        </section>
+        <aside class="side-panel">
+          <div class="profile-card"><button class="avatar current admin-icon avatar-picker" id="currentAvatar" type="button" aria-label="&#54532;&#47196;&#54596; &#49324;&#51652; &#48320;&#44221;" title="&#54532;&#47196;&#54596; &#49324;&#51652; &#48320;&#44221;"></button><input id="avatarFileInput" class="hidden-file" type="file" accept="image/*" /><div><strong id="currentName">&#44288;&#47532;&#51088;</strong><span id="currentRole">admin</span></div><button id="logoutButton" class="mini-button" type="button">&#47196;&#44536;&#50500;&#50883;</button></div>
+          <div id="approvalPanel" class="panel-block approvals hidden"><div class="panel-title"><strong>가입 승인</strong><span id="pendingCount">0</span></div><div id="pendingList" class="mini-list"></div></div>
+          <div id="quickStats" class="panel-block stats"></div>
+          <div class="panel-block calendar-panel"><div class="panel-title"><strong>일정</strong><span>마감</span></div><div id="calendarList" class="mini-list"></div></div>
+        </aside>
+      </main>
+    </div>
+
+    <div id="composeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="composeTitle">
+      <div class="modal-backdrop" data-action="close-compose"></div>
+      <section class="compose-dialog">
+        <header class="compose-header"><button class="modal-close" data-action="close-compose" type="button" aria-label="닫기">×</button><h2 id="composeTitle">새 게시물 만들기</h2><span></span></header>
+        <form id="postForm" class="modal-form">
+          <div class="compose-fields">
+            <select id="postTypeSelect" name="type" aria-label="글 유형"><option value="general">일반 게시글</option><option value="notice">공지</option><option value="mission">미션</option><option value="question">질문</option></select>
+            <input name="title" placeholder="제목" required />
+            <textarea name="body" placeholder="내용" required></textarea>
+            <div class="date-grid"><input name="startDate" type="date" aria-label="시작일" /><input name="dueDate" type="date" aria-label="마감일" /></div><label class="completion-toggle"><input type="checkbox" name="completionRules" value="done" /> 완료 확인 사용</label>
+          </div>
+          <fieldset id="missionSettings" class="mission-settings hidden"><legend>미션 설정</legend><section class="mission-section"><strong>참여 인원</strong><div id="missionTargets" class="check-grid"></div></section></fieldset>
+          <div class="upload-drop"><div class="upload-copy"><div class="upload-icon">▧</div><div><strong>파일 첨부</strong><p>영상, 이미지, 문서를 Google Drive에 올리고 게시물에 연결합니다.</p></div></div><label class="drive-upload-button"><input id="driveFileInput" name="driveFile" type="file" multiple />파일 선택</label><span id="driveUploadStatus" class="upload-status"></span></div>
+          <input name="mediaUrl" placeholder="영상/HTML/이미지 링크" />
+          <input name="attachmentUrl" placeholder="첨부파일 다운로드 링크" />
+          <p class="form-help">기간을 지정하면 우측 일정에 표시됩니다.</p>
+          <button type="submit">게시</button>
+        </form>
+      </section>
+    </div>
+
+    <template id="emptyTemplate"><div class="empty">아직 등록된 내용이 없습니다.</div></template>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js?v=supabase-2"></script>
+    <script src="app-state.js?v=completion-users-1"></script>
+    <script src="supabase-client.js?v=avatar-upload-1"></script>
+    <script src="app.js?v=version-notification-1"></script>
   </body>
 </html>
