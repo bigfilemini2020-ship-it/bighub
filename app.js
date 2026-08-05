@@ -5,7 +5,7 @@ const autoLoginKey = "bighub-auto-login";
 const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
-const webAppVersion = "2026.08.05-version-notification-1";
+const webAppVersion = "2026.08.05-video-buffer-guard-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -22,6 +22,7 @@ let desktopNotificationsArmed = false;
 let desktopUpdateInfo = null;
 let desktopUpdateChecking = false;
 let desktopAppVersion = "";
+let mediaRenderHoldUntil = 0;
 
 async function loadDesktopAppVersion() {
   if (!isDesktopApp()) return;
@@ -324,12 +325,24 @@ function hasActiveCommentDraft() {
   return fields.some((field) => field === document.activeElement && field.value.trim());
 }
 
+function isFullscreenActive() {
+  return Boolean(document.fullscreenElement || document.webkitFullscreenElement || document.pictureInPictureElement);
+}
+
+function holdMediaRender(ms = 30000) {
+  mediaRenderHoldUntil = Math.max(mediaRenderHoldUntil, Date.now() + ms);
+}
+
 function hasActiveMediaPlayback() {
-  return Array.from(document.querySelectorAll("video, audio")).some((media) => !media.paused && !media.ended);
+  return Array.from(document.querySelectorAll("video, audio")).some((media) => {
+    const activelyPlaying = !media.paused && !media.ended;
+    const bufferingDuringPlayback = activelyPlaying && media.readyState < 3;
+    return activelyPlaying || media.seeking || bufferingDuringPlayback;
+  });
 }
 
 function shouldDeferRemoteRender() {
-  return hasActiveCommentDraft() || hasActiveMediaPlayback() || Boolean(document.fullscreenElement || document.pictureInPictureElement);
+  return hasActiveCommentDraft() || hasActiveMediaPlayback() || isFullscreenActive() || Date.now() < mediaRenderHoldUntil;
 }
 
 async function syncRemoteData() {
@@ -465,7 +478,18 @@ async function handleAvatarFile(file) {
   }
 }
 
+function bindMediaRenderGuards() {
+  const holdEvents = new Set(["play", "playing", "waiting", "seeking", "stalled", "progress", "timeupdate", "fullscreenchange", "webkitfullscreenchange"]);
+  holdEvents.forEach((name) => document.addEventListener(name, (event) => {
+    if (name.includes("fullscreen") || event.target?.matches?.("video, audio")) holdMediaRender(name === "timeupdate" ? 15000 : 45000);
+  }, true));
+  ["pause", "ended"].forEach((name) => document.addEventListener(name, (event) => {
+    if (event.target?.matches?.("video, audio")) holdMediaRender(3000);
+  }, true));
+}
+
 function bindNavigation() {
+  bindMediaRenderGuards();
   document.querySelectorAll(".rail-button[data-view]").forEach((button) => button.addEventListener("click", () => { activeView = button.dataset.view; render(); }));
   document.querySelector("[data-action='compose-focus']").addEventListener("click", openComposeModal);
   document.querySelectorAll("[data-action='close-compose']").forEach((item) => item.addEventListener("click", closeComposeModal));
@@ -1047,7 +1071,7 @@ function iconSvg(name) { const icons = { heart: `<svg viewBox="0 0 24 24" aria-h
 function mediaPreviewHtml(url, post) {
   const attachment = attachmentList(post).find((item) => item.url === url) || null;
   if (isDriveDownloadUrl(url) && isVideoAttachment(post, attachment)) {
-    return `<div class="media-preview video-preview"><video class="drive-video" controls preload="metadata" playsinline data-drive-src="${escapeHtml(`${url}&inline=1`)}"></video></div>`;
+    return `<div class="media-preview video-preview"><video class="drive-video" controls preload="auto" playsinline data-drive-src="${escapeHtml(`${url}&inline=1`)}"></video></div>`;
   }
   if (isDriveDownloadUrl(url) && isImageAttachment(post, attachment)) {
     return `<div class="media-preview image-preview"><img class="drive-image" data-drive-src="${escapeHtml(`${url}&inline=1`)}" alt="${escapeHtml(post.title)}" loading="lazy" /></div>`;
@@ -1067,6 +1091,10 @@ async function hydrateDriveVideos() {
   media.forEach((item) => {
     const separator = item.dataset.driveSrc.includes("?") ? "&" : "?";
     item.src = `${item.dataset.driveSrc}${separator}token=${encodeURIComponent(token)}`;
+    if (item.tagName === "VIDEO") {
+      item.preload = "auto";
+      item.load();
+    }
   });
 }
 function commentsHtml(postId, comments) {
