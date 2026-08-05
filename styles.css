@@ -1782,3 +1782,41 @@ textarea {
 .reply-form {
   margin: 8px 0 0;
 }
+
+
+/* Feed action cleanup */
+.icon-action.comment {
+  display: none;
+}
+
+.feed-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.feed-actions .completion-avatars {
+  margin-left: 2px;
+  margin-right: auto;
+}
+
+.completion-avatars {
+  gap: 0;
+}
+
+.completion-avatar {
+  width: 30px;
+  height: 30px;
+}
+
+.drive-attachment span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drive-attachment strong {
+  display: none;
+}

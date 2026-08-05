@@ -432,8 +432,7 @@ function attachmentHtml(post) {
   if (!post.attachmentUrl) return "";
   if (isDriveDownloadUrl(post.attachmentUrl)) {
     const name = post.attachmentName || driveFileName(post.attachmentUrl);
-    const kind = isVideoAttachment(post) ? "영상" : "파일";
-    return `<div class="attachment-line drive-attachment"><span><strong>${kind}</strong>${escapeHtml(name)}</span></div>`;
+    return `<div class="attachment-line drive-attachment"><span>${escapeHtml(name)}</span></div>`;
   }
   return `<div class="attachment-line">${linkHtml(post.attachmentUrl, "첨부파일 열기")}</div>`;
 }
