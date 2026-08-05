@@ -657,6 +657,12 @@ function isVideoAttachment(post) {
   return mime.startsWith("video/") || /\.(mp4|mov|m4v|webm)(\?.*)?$/.test(name);
 }
 
+function isImageAttachment(post) {
+  const mime = String(post.attachmentMimeType || "").toLowerCase();
+  const name = String(post.attachmentName || driveFileName(post.attachmentUrl)).toLowerCase();
+  return mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/.test(name);
+}
+
 function attachmentHtml(post) {
   if (!post.attachmentUrl) return "";
   if (isDriveDownloadUrl(post.attachmentUrl)) {
@@ -831,6 +837,9 @@ function mediaPreviewHtml(url, post) {
   if (isDriveDownloadUrl(url) && isVideoAttachment(post)) {
     return `<div class="media-preview video-preview"><video class="drive-video" controls preload="metadata" playsinline data-drive-src="${escapeHtml(`${url}&inline=1`)}"></video></div>`;
   }
+  if (isDriveDownloadUrl(url) && isImageAttachment(post)) {
+    return `<div class="media-preview image-preview"><img class="drive-image" data-drive-src="${escapeHtml(`${url}&inline=1`)}" alt="${escapeHtml(post.title)}" loading="lazy" /></div>`;
+  }
   const preview = S.getLinkPreview(url);
   if (preview.type === "youtube") return `<a class="media-preview" href="${escapeHtml(url)}" target="_blank" rel="noreferrer"><img src="${escapeHtml(preview.thumbnailUrl)}" alt="${escapeHtml(post.title)} 썸네일" /></a>`;
   if (preview.type === "image") return `<a class="media-preview" href="${escapeHtml(url)}" target="_blank" rel="noreferrer"><img src="${escapeHtml(url)}" alt="${escapeHtml(post.title)}" /></a>`;
@@ -839,13 +848,13 @@ function mediaPreviewHtml(url, post) {
 }
 
 async function hydrateDriveVideos() {
-  const videos = Array.from(document.querySelectorAll("video[data-drive-src]:not([src])"));
-  if (!videos.length || !remoteAuth()) return;
+  const media = Array.from(document.querySelectorAll("[data-drive-src]:not([src])"));
+  if (!media.length || !remoteAuth()) return;
   const token = await window.BigHubSupabase.accessToken().catch(() => "");
   if (!token) return;
-  videos.forEach((video) => {
-    const separator = video.dataset.driveSrc.includes("?") ? "&" : "?";
-    video.src = `${video.dataset.driveSrc}${separator}token=${encodeURIComponent(token)}`;
+  media.forEach((item) => {
+    const separator = item.dataset.driveSrc.includes("?") ? "&" : "?";
+    item.src = `${item.dataset.driveSrc}${separator}token=${encodeURIComponent(token)}`;
   });
 }
 function commentsHtml(postId, comments) {
