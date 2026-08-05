@@ -1892,3 +1892,24 @@ textarea {
   border-color: #cbd5e1;
   color: #334155;
 }
+
+/* Keep default avatars fully visible */
+.text-card {
+  overflow: visible;
+}
+
+.feed-actions,
+.completion-avatars {
+  overflow: visible;
+}
+
+.completion-avatar {
+  flex: 0 0 30px;
+  text-align: center;
+}
+
+.avatar,
+.completion-avatar,
+.comment-avatar {
+  box-sizing: border-box;
+}
