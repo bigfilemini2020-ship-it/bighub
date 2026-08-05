@@ -127,13 +127,18 @@ async function tryRefreshRemoteData() {
   }
 }
 
+function hasActiveCommentDraft() {
+  const fields = Array.from(document.querySelectorAll("form[data-action='comment'] input, form[data-action='comment'] textarea"));
+  return fields.some((field) => field === document.activeElement && field.value.trim());
+}
+
 async function syncRemoteData() {
   if (!remoteAuth() || !currentUser() || remoteSyncInFlight) return;
   remoteSyncInFlight = true;
   try {
     const error = await tryRefreshRemoteData();
     if (error) console.warn(error);
-    else render();
+    else if (!hasActiveCommentDraft()) render();
   } finally {
     remoteSyncInFlight = false;
   }
