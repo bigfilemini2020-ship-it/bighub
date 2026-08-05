@@ -145,6 +145,30 @@ grant execute on function public.is_admin() to authenticated;
 grant execute on function public.is_approved() to authenticated;
 grant execute on function public.handle_new_user_profile() to authenticated;
 
+create or replace function public.delete_post(post_id_input uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  deleted_count integer := 0;
+begin
+  if auth.uid() is null or not public.is_approved() then
+    return false;
+  end if;
+
+  delete from public.posts
+  where id = post_id_input
+    and (author_id = auth.uid() or public.is_admin());
+
+  get diagnostics deleted_count = row_count;
+  return deleted_count > 0;
+end;
+$$;
+
+grant execute on function public.delete_post(uuid) to authenticated;
+
 -- Repair Auth users created before the trigger existed.
 insert into public.profiles (id, login_id, auth_email, name, department, role, status, avatar)
 select

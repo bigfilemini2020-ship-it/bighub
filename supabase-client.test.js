@@ -139,6 +139,30 @@ test("deletePost verifies that a row was actually deleted", async () => {
   assert.equal(selected, true);
 });
 
+test("deletePost falls back to admin RPC when RLS hides deleted rows", async () => {
+  let rpcCalled = false;
+  const fakeClient = {
+    from() {
+      return {
+        delete: () => ({
+          eq: () => ({
+            select: async () => ({ data: [], error: null }),
+          }),
+        }),
+      };
+    },
+    rpc(name, payload) {
+      rpcCalled = true;
+      assert.equal(name, "delete_post");
+      assert.equal(payload.post_id_input, "post-1");
+      return { data: true, error: null };
+    },
+  };
+
+  await loadClient(fakeClient).deletePost("post-1");
+  assert.equal(rpcCalled, true);
+});
+
 test("deletePost reports zero deleted rows as a permission problem", async () => {
   const fakeClient = {
     from() {
@@ -150,11 +174,12 @@ test("deletePost reports zero deleted rows as a permission problem", async () =>
         }),
       };
     },
+    rpc: async () => ({ data: false, error: null }),
   };
 
   await assert.rejects(
     () => loadClient(fakeClient).deletePost("post-1"),
-    /Supabase SQL|posts/
+    /delete_post|삭제 권한/
   );
 });
 
