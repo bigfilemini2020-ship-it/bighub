@@ -159,7 +159,7 @@
 
   async function listProfiles() {
     const { data, error } = await client().from("profiles").select("*").order("created_at", { ascending: true });
-    if (error) throw new Error(userMessage(error));
+    if (error) throw new Error(userMessage(error, "\uAC00\uC785 \uC2B9\uC778 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."));
     return data.map(toUser);
   }
 
@@ -247,8 +247,17 @@
 
   async function approveProfile(id) {
     const { error } = await client().from("profiles").update({ status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
-    if (error) throw new Error(userMessage(error, "가입 승인 처리에 실패했습니다."));
+    if (error) throw new Error(userMessage(error, "\uAC00\uC785 \uC2B9\uC778 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."));
   }
 
-  root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, listContent, createPost, updatePost, deletePost, addReaction, addComment, deleteComment, recordFileDownload, approveProfile, accessToken };
+  async function updateAvatar(avatar) {
+    const auth = client();
+    const { data } = await auth.auth.getUser();
+    const userId = data.user?.id;
+    if (!userId) throw new Error("\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.");
+    const { error } = await auth.from("profiles").update({ avatar }).eq("id", userId);
+    if (error) throw new Error(userMessage(error, "\uD504\uB85C\uD544 \uC0AC\uC9C4 \uC800\uC7A5 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. Supabase SQL \uC5C5\uB370\uC774\uD2B8\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4."));
+  }
+
+  root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, listContent, createPost, updatePost, deletePost, addReaction, addComment, deleteComment, recordFileDownload, approveProfile, updateAvatar, accessToken };
 })(window);

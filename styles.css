@@ -1820,3 +1820,39 @@ textarea {
 .drive-attachment strong {
   display: none;
 }
+
+.hidden-file {
+  display: none;
+}
+
+.avatar-picker {
+  border: 0;
+  cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+.avatar-picker:hover,
+.avatar-picker:focus-visible {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+  outline: none;
+}
+
+.avatar.image-avatar,
+.completion-avatar.image-avatar,
+.comment-avatar.image-avatar {
+  overflow: hidden;
+  background: #f8fafc;
+  color: transparent;
+}
+
+.avatar.image-avatar img,
+.completion-avatar.image-avatar img,
+.comment-avatar.image-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BigHub</title>
     <link rel="icon" type="image/svg+xml" href="assets/bighub-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=feed-actions-1" />
+    <link rel="stylesheet" href="styles.css?v=avatar-upload-1" />
   </head>
   <body>
     <section id="authView" class="auth-view">
@@ -56,7 +56,6 @@
         <button class="rail-button" data-view="feed" type="button"><span>?</span><strong>질문</strong></button>
         <button class="rail-button" data-view="progress" type="button"><span>▤</span><strong>현황</strong></button>
         <button id="approvalMenuButton" class="rail-button admin-only hidden" data-view="approvals" type="button"><span>✓</span><strong>가입 승인</strong></button>
-        <button class="rail-button" data-action="profile" type="button"><span>●</span><strong>프로필</strong></button>
         <button id="resetDemo" class="rail-button rail-bottom" type="button"><span>↺</span><strong>초기화</strong></button>
       </aside>
 
@@ -85,7 +84,7 @@
           </section>
         </section>
         <aside class="side-panel">
-          <div class="profile-card"><div class="avatar current admin-icon" id="currentAvatar" aria-label="관리자"></div><div><strong id="currentName">관리자</strong><span id="currentRole">admin</span></div><button id="logoutButton" class="mini-button" type="button">로그아웃</button></div>
+          <div class="profile-card"><button class="avatar current admin-icon avatar-picker" id="currentAvatar" type="button" aria-label="&#54532;&#47196;&#54596; &#49324;&#51652; &#48320;&#44221;" title="&#54532;&#47196;&#54596; &#49324;&#51652; &#48320;&#44221;"></button><input id="avatarFileInput" class="hidden-file" type="file" accept="image/*" /><div><strong id="currentName">&#44288;&#47532;&#51088;</strong><span id="currentRole">admin</span></div><button id="logoutButton" class="mini-button" type="button">&#47196;&#44536;&#50500;&#50883;</button></div>
           <div id="approvalPanel" class="panel-block approvals hidden"><div class="panel-title"><strong>가입 승인</strong><span id="pendingCount">0</span></div><div id="pendingList" class="mini-list"></div></div>
           <div id="quickStats" class="panel-block stats"></div>
           <div class="panel-block calendar-panel"><div class="panel-title"><strong>일정</strong><span>마감</span></div><div id="calendarList" class="mini-list"></div></div>
@@ -118,7 +117,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js?v=supabase-2"></script>
     <script src="app-state.js?v=completion-users-1"></script>
-    <script src="supabase-client.js?v=error-detail-1"></script>
-    <script src="app.js?v=feed-actions-1"></script>
+    <script src="supabase-client.js?v=avatar-upload-1"></script>
+    <script src="app.js?v=avatar-upload-1"></script>
   </body>
 </html>

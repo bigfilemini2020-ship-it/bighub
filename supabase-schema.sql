@@ -79,6 +79,8 @@ alter table public.posts add column if not exists updated_at timestamptz;
 alter table public.comments add column if not exists parent_id uuid references public.comments(id) on delete cascade;
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.profiles to authenticated;
+revoke update on public.profiles from authenticated;
+grant update (avatar, status, approved_at, approved_by) on public.profiles to authenticated;
 grant select, insert, update, delete on public.posts to authenticated;
 grant select, insert, update, delete on public.mission_targets to authenticated;
 grant select, insert, update, delete on public.comments to authenticated;
@@ -176,6 +178,12 @@ create policy "profiles admin update" on public.profiles
 for update to authenticated
 using (public.is_admin())
 with check (public.is_admin());
+
+drop policy if exists "profiles update own avatar" on public.profiles;
+create policy "profiles update own avatar" on public.profiles
+for update to authenticated
+using (auth.uid() = id and public.is_approved())
+with check (auth.uid() = id and public.is_approved());
 
 drop policy if exists "approved select posts" on public.posts;
 create policy "approved select posts" on public.posts for select to authenticated using (public.is_approved());

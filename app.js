@@ -29,7 +29,16 @@ function escapeHtml(value) { return String(value || "").replaceAll("&", "&amp;")
 function user(userId) { return state.users.find((item) => item.id === userId) || state.users[0]; }
 function userName(userId) { return user(userId).name; }
 function currentUser() { return state.users.find((item) => item.id === currentUserId) || null; }
-function avatarHtml(userId) { const item = user(userId); return item.role === "admin" ? `<div class="avatar admin-icon" aria-label="관리자"></div>` : `<div class="avatar">${escapeHtml(item.avatar || item.name.slice(0, 1))}</div>`; }
+function isImageAvatar(value) { return /^(data:image\/|https?:\/\/)/.test(String(value || "")); }
+function avatarMarkup(item, className = "avatar") {
+  const target = item || {};
+  const label = escapeHtml(target.name || "\uC0AC\uC6A9\uC790");
+  const value = target.avatar || "";
+  if (isImageAvatar(value)) return `<span class="${className} image-avatar" aria-label="${label}" title="${label}"><img src="${escapeHtml(value)}" alt="" /></span>`;
+  if (target.role === "admin") return `<span class="${className} admin-icon" aria-label="${label}" title="${label}"></span>`;
+  return `<span class="${className}" aria-label="${label}" title="${label}">${escapeHtml(value || String(target.name || "?").slice(0, 1))}</span>`;
+}
+function avatarHtml(userId) { return avatarMarkup(user(userId), "avatar"); }
 function linkHtml(url, label) { return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${label}</a>` : ""; }
 function emptyHtml() { return byId("emptyTemplate").innerHTML; }
 function setSession(userId, autoLogin) { const primary = autoLogin ? localStorage : sessionStorage; const secondary = autoLogin ? sessionStorage : localStorage; primary.setItem(sessionKey, userId); secondary.removeItem(sessionKey); if (autoLogin) localStorage.setItem(autoLoginKey, "1"); else localStorage.removeItem(autoLoginKey); }
@@ -211,6 +220,54 @@ function bindAuthForms() {
   });
 }
 
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("\uC774\uBBF8\uC9C0\uB97C \uCC98\uB9AC\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."));
+    image.src = src;
+  });
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("\uC774\uBBF8\uC9C0\uB97C \uC77D\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4."));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function resizeAvatarImage(file) {
+  if (!file || !file.type.startsWith("image/")) throw new Error("\uC774\uBBF8\uC9C0 \uD30C\uC77C\uC744 \uC120\uD0DD\uD558\uC138\uC694.");
+  const source = await readFileAsDataUrl(file);
+  const image = await loadImage(source);
+  const size = 256;
+  const side = Math.min(image.width, image.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const context = canvas.getContext("2d");
+  context.drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, size, size);
+  return canvas.toDataURL("image/jpeg", 0.82);
+}
+
+function updateCurrentUserAvatar(avatar) {
+  state = { ...state, users: state.users.map((item) => item.id === currentUserId ? { ...item, avatar } : item) };
+}
+
+async function handleAvatarFile(file) {
+  const avatar = await resizeAvatarImage(file);
+  if (remoteAuth()) await window.BigHubSupabase.updateAvatar(avatar);
+  updateCurrentUserAvatar(avatar);
+  saveState();
+  render();
+  if (remoteAuth()) {
+    await refreshRemoteData();
+    render();
+  }
+}
+
 function bindNavigation() {
   document.querySelectorAll(".rail-button[data-view]").forEach((button) => button.addEventListener("click", () => { activeView = button.dataset.view; render(); }));
   document.querySelector("[data-action='compose-focus']").addEventListener("click", openComposeModal);
@@ -223,6 +280,18 @@ function bindNavigation() {
   window.setInterval(syncRemoteData, 30000);
   byId("globalSearch").addEventListener("input", renderSearch);
   byId("logoutButton").addEventListener("click", async () => { if (remoteAuth()) await window.BigHubSupabase.signOut(); currentUserId = ""; clearSession(); render(); });
+  byId("currentAvatar")?.addEventListener("click", () => byId("avatarFileInput")?.click());
+  byId("avatarFileInput")?.addEventListener("change", async (event) => {
+    const file = event.currentTarget.files?.[0];
+    if (!file) return;
+    try {
+      await handleAvatarFile(file);
+    } catch (error) {
+      alert(error.message || "\uD504\uB85C\uD544 \uC0AC\uC9C4 \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+    } finally {
+      event.currentTarget.value = "";
+    }
+  });
   byId("resetDemo").addEventListener("click", () => { localStorage.removeItem(storeKey); clearSession(); state = loadState(); currentUserId = ""; render(); });
 }
 
@@ -529,7 +598,18 @@ function renderMissionTargets() {
   target.innerHTML = state.users.filter((item) => item.role === "member").map((item) => `<label><input type="checkbox" name="targetUserIds" value="${item.id}" checked /> ${escapeHtml(item.name)} · ${escapeHtml(item.department || "")}</label>`).join("");
 }
 
-function renderCurrentUser() { const item = currentUser(); const avatar = byId("currentAvatar"); avatar.classList.toggle("admin-icon", item.role === "admin"); avatar.textContent = item.role === "admin" ? "" : item.avatar || item.name.slice(0, 1); avatar.setAttribute("aria-label", item.role === "admin" ? "관리자" : item.name); byId("currentName").textContent = item.name; byId("currentRole").textContent = item.role === "admin" ? "admin" : `${item.department} · ${item.role}`; }
+function renderCurrentUser() {
+  const item = currentUser();
+  const avatar = byId("currentAvatar");
+  if (avatar && item) {
+    avatar.className = `avatar current avatar-picker${isImageAvatar(item.avatar) ? " image-avatar" : ""}${!isImageAvatar(item.avatar) && item.role === "admin" ? " admin-icon" : ""}`;
+    avatar.innerHTML = isImageAvatar(item.avatar) ? `<img src="${escapeHtml(item.avatar)}" alt="" />` : (item.role === "admin" ? "" : escapeHtml(item.avatar || item.name.slice(0, 1)));
+    avatar.setAttribute("aria-label", "\uD504\uB85C\uD544 \uC0AC\uC9C4 \uBCC0\uACBD");
+    avatar.setAttribute("title", "\uD504\uB85C\uD544 \uC0AC\uC9C4 \uBCC0\uACBD");
+  }
+  byId("currentName").textContent = item.name;
+  byId("currentRole").textContent = item.role === "admin" ? "admin" : `${item.department} \u00B7 ${item.role}`;
+}
 
 function canManagePost(post) { const item = currentUser(); return Boolean(item && (item.role === "admin" || post.authorId === item.id)); }
 function canEditPost(post) { return canManagePost(post); }
@@ -569,10 +649,7 @@ function postCardHtml(post) {
   return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${menuButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<div class="feed-actions">${doneAction}${completionAvatars}${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form></section></article>`;
 }
 function miniAvatarHtml(userId) {
-  const item = user(userId);
-  const label = escapeHtml(item.name);
-  if (item.role === "admin") return `<span class="completion-avatar admin-icon" title="${label}" aria-label="${label}"></span>`;
-  return `<span class="completion-avatar" title="${label}" aria-label="${label}">${escapeHtml(item.avatar || item.name.slice(0, 1))}</span>`;
+  return avatarMarkup(user(userId), "completion-avatar");
 }
 
 function completionAvatarStack(userIds = []) {
@@ -622,10 +699,7 @@ function replyHtml(comment) {
   return `<div class="comment reply" id="comment-${comment.id}">${commentAvatarHtml(comment.userId)}<div class="comment-content"><p><strong>${escapeHtml(userName(comment.userId))}</strong>${escapeHtml(comment.body)}</p>${canDelete ? `<div class="comment-tools"><button data-action="delete-comment" data-comment-id="${comment.id}" type="button">삭제</button></div>` : ""}</div></div>`;
 }
 function commentAvatarHtml(userId) {
-  const item = user(userId);
-  const label = escapeHtml(item.name);
-  if (item.role === "admin") return `<span class="comment-avatar admin-icon" aria-label="${label}" title="${label}"></span>`;
-  return `<span class="comment-avatar" aria-label="${label}" title="${label}">${escapeHtml(item.avatar || item.name.slice(0, 1))}</span>`;
+  return avatarMarkup(user(userId), "comment-avatar");
 }
 function dateText(post) { if (post.startDate && post.dueDate) return ` · ${post.startDate} ~ ${post.dueDate}`; if (post.dueDate) return ` · ${post.dueDate} 마감`; if (post.startDate) return ` · ${post.startDate} 시작`; return ""; }
 
