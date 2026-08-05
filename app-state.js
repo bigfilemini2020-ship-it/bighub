@@ -266,9 +266,15 @@
     return user ? { ...user, password: undefined } : null;
   }
 
+  function completableUserIds(state) {
+    return (state.users || [])
+      .filter((user) => user.status === "approved" || user.approvedAt)
+      .map((user) => user.id);
+  }
+
   function getPostCompletion(state, postId) {
     const post = state.posts.find((item) => item.id === postId) || {};
-    const targets = post.targetUserIds && post.targetUserIds.length ? post.targetUserIds : memberIds;
+    const targets = post.targetUserIds && post.targetUserIds.length ? post.targetUserIds : completableUserIds(state);
     const rules = post.completionRules && post.completionRules.length ? post.completionRules : [];
     if (!rules.length) return { postId, totalMembers: 0, completedCount: 0, completedUserIds: [], percent: 0 };
     const completedUserIds = targets.filter((userId) => rules.every((rule) => hasCheckpoint(state, postId, userId, rule))).sort();

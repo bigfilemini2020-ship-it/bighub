@@ -136,6 +136,33 @@ test("like and done reactions are independent and toggle off", () => {
   assert.equal(new Set(state.reactions.map((reaction) => reaction.id)).size, state.reactions.length);
 });
 
+test("done completion uses current approved users when no targets are selected", () => {
+  let state = createInitialState(now);
+  const userId = "11111111-1111-4111-8111-111111111111";
+  state = {
+    ...state,
+    users: [
+      ...state.users,
+      { id: userId, loginId: "rujina", authEmail: "rujina@bighub.local", name: "Member", department: "Ops", role: "member", avatar: "M", status: "approved" },
+    ],
+  };
+  state = addPost(state, {
+    type: "notice",
+    title: "Video guide",
+    body: "Watch this",
+    authorId: "u-admin",
+    completionRules: ["done"],
+  }, now);
+
+  const postId = state.posts[0].id;
+  state = addReaction(state, { postId, userId, sticker: "done" }, now);
+
+  const completion = getPostCompletion(state, postId);
+
+  assert.equal(completion.completedCount, 1);
+  assert.deepEqual(completion.completedUserIds, [userId]);
+});
+
 test("like reaction does not mark a post complete", () => {
   let state = createInitialState(now);
   state = addPost(state, {
