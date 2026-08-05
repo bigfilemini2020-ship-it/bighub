@@ -616,11 +616,17 @@ function commentsHtml(postId, comments) {
 }
 function commentHtml(comment, replies = []) {
   const canDelete = currentUser()?.role === "admin" || comment.userId === currentUserId;
-  return `<div class="comment" id="comment-${comment.id}"><div class="comment-main"><strong>${escapeHtml(userName(comment.userId))}</strong><span>${escapeHtml(comment.body)}</span></div><div class="comment-tools"><button data-focus-reply="${comment.id}" type="button">답글</button>${canDelete ? `<button data-action="delete-comment" data-comment-id="${comment.id}" type="button">삭제</button>` : ""}</div>${replies.length ? `<div class="reply-list">${replies.map((reply) => replyHtml(reply)).join("")}</div>` : ""}<form class="inline-form reply-form hidden" data-action="comment" data-post-id="${comment.postId}" data-parent-id="${comment.id}"><input name="body" placeholder="답글을 입력하세요." required /><button type="submit">게시</button></form></div>`;
+  return `<div class="comment" id="comment-${comment.id}">${commentAvatarHtml(comment.userId)}<div class="comment-content"><p><strong>${escapeHtml(userName(comment.userId))}</strong>${escapeHtml(comment.body)}</p><div class="comment-tools"><button data-focus-reply="${comment.id}" type="button">답글</button>${canDelete ? `<button data-action="delete-comment" data-comment-id="${comment.id}" type="button">삭제</button>` : ""}</div>${replies.length ? `<div class="reply-list">${replies.map((reply) => replyHtml(reply)).join("")}</div>` : ""}<form class="inline-form reply-form hidden" data-action="comment" data-post-id="${comment.postId}" data-parent-id="${comment.id}"><input name="body" placeholder="답글을 입력하세요." required /><button type="submit">게시</button></form></div></div>`;
 }
 function replyHtml(comment) {
   const canDelete = currentUser()?.role === "admin" || comment.userId === currentUserId;
-  return `<div class="comment reply" id="comment-${comment.id}"><div class="comment-main"><strong>${escapeHtml(userName(comment.userId))}</strong><span>${escapeHtml(comment.body)}</span></div>${canDelete ? `<div class="comment-tools"><button data-action="delete-comment" data-comment-id="${comment.id}" type="button">삭제</button></div>` : ""}</div>`;
+  return `<div class="comment reply" id="comment-${comment.id}">${commentAvatarHtml(comment.userId)}<div class="comment-content"><p><strong>${escapeHtml(userName(comment.userId))}</strong>${escapeHtml(comment.body)}</p>${canDelete ? `<div class="comment-tools"><button data-action="delete-comment" data-comment-id="${comment.id}" type="button">삭제</button></div>` : ""}</div></div>`;
+}
+function commentAvatarHtml(userId) {
+  const item = user(userId);
+  const label = escapeHtml(item.name);
+  if (item.role === "admin") return `<span class="comment-avatar admin-icon" aria-label="${label}" title="${label}"></span>`;
+  return `<span class="comment-avatar" aria-label="${label}" title="${label}">${escapeHtml(item.avatar || item.name.slice(0, 1))}</span>`;
 }
 function dateText(post) { if (post.startDate && post.dueDate) return ` · ${post.startDate} ~ ${post.dueDate}`; if (post.dueDate) return ` · ${post.dueDate} 마감`; if (post.startDate) return ` · ${post.startDate} 시작`; return ""; }
 
