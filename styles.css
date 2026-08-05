@@ -1893,14 +1893,21 @@ textarea {
   color: #334155;
 }
 
-/* Keep default avatars fully visible */
-.text-card {
-  overflow: visible;
-}
-
+/* Keep circular avatars clear of text-card crop and timeline border. */
+.text-card,
+.text-card .feed-head,
+.text-card .author-line,
 .feed-actions,
 .completion-avatars {
   overflow: visible;
+}
+
+.text-card .feed-head {
+  padding-left: 22px;
+}
+
+.text-card .feed-body {
+  margin-left: 62px;
 }
 
 .completion-avatar {
