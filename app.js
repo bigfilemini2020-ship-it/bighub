@@ -20,6 +20,8 @@ let desktopSettings = null;
 let desktopNotificationsArmed = false;
 let desktopUpdateInfo = null;
 let desktopUpdateChecking = false;
+let expandedPostIds = new Set();
+let openCommentPostIds = new Set();
 
 function loadState() {
   const saved = localStorage.getItem(storeKey);
@@ -802,20 +804,31 @@ function sortFeedPosts(posts) {
 
 function postCardHtml(post) {
   const completionEnabled = hasCompletionCheck(post);
-  const completion = completionEnabled ? S.getPostCompletion(state, post.id) : { totalMembers: 0 };
+  const completion = completionEnabled ? S.getPostCompletion(state, post.id) : { totalMembers: 0, completedCount: 0, completedUserIds: [] };
   const reactions = state.reactions.filter((reaction) => reaction.postId === post.id);
   const comments = state.comments.filter((comment) => comment.postId === post.id);
   const mine = reactions.filter((reaction) => reaction.userId === currentUserId);
+  const userDone = mine.some((reaction) => reaction.sticker === "done");
   const doneCount = completionEnabled ? completion.completedCount : reactions.filter((reaction) => reaction.sticker === "done").length;
   const mediaUrl = post.mediaUrl || post.videoUrl || post.attachmentUrl;
   const presentation = S.getPostPresentation(post);
-  const cardClass = presentation.kind === "text" ? "feed-card text-card" : "feed-card media-card";
-  const preview = presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post) : "";
+  const baseClass = presentation.kind === "text" ? "feed-card text-card" : "feed-card media-card";
+  const collapsed = completionEnabled && userDone && !expandedPostIds.has(post.id);
+  const commentsOpen = openCommentPostIds.has(post.id);
+  const cardClass = collapsed ? `${baseClass} collapsed-card` : baseClass;
+  const preview = !collapsed && presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post) : "";
   const menuButton = canManagePost(post) ? postMenuHtml(post.id) : "";
   const doneLabel = post.type === "mission" ? `완료 ${doneCount}/${completion.totalMembers}` : `완료 ${doneCount}`;
   const doneAction = completionEnabled ? actionButton(post.id, "done", mine, "check", doneLabel) : "";
+  const commentAction = `<button class="icon-action comment${commentsOpen ? " active" : ""}" data-action="toggle-comments" data-post-id="${escapeHtml(post.id)}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글 ${comments.length}</span></button>`;
   const completionAvatars = completionEnabled ? completionAvatarStack(completion.completedUserIds) : "";
-  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${menuButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<div class="feed-actions">${doneAction}${completionAvatars}${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form></section></article>`;
+  const actions = `<div class="feed-actions">${doneAction}${completionAvatars}${commentAction}${saveControlHtml(post)}</div>`;
+  const commentsPanel = commentsOpen ? `<div class="comments-panel">${comments.length ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form></div>` : "";
+  const header = `<header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${menuButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>`;
+  if (collapsed) {
+    return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}">${header}<section class="feed-body collapsed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">확인한 글입니다.</p><button class="expand-post-button" data-action="expand-post" data-post-id="${escapeHtml(post.id)}" type="button">더보기</button>${actions}${commentsPanel}</section></article>`;
+  }
+  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}">${header}${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}${actions}${commentsPanel}</section></article>`;
 }
 function miniAvatarHtml(userId) {
   return avatarMarkup(user(userId), "completion-avatar");
@@ -886,7 +899,7 @@ function formatDate(value) { const date = new Date(value); return Number.isNaN(d
 
 document.addEventListener("click", async (event) => {
   const focusTarget = event.target.closest("[data-focus-comment]");
-  if (focusTarget) { const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
+  if (focusTarget) { openCommentPostIds.add(focusTarget.dataset.focusComment); renderFeed(); const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
   const replyTarget = event.target.closest("[data-focus-reply]");
   if (replyTarget) { const form = replyTarget.closest(".comment")?.querySelector(".reply-form"); if (form) { form.classList.toggle("hidden"); form.querySelector("input")?.focus(); } return; }
   const target = event.target.closest("[data-action]");
@@ -925,6 +938,18 @@ document.addEventListener("click", async (event) => {
       return;
     }
     state = S.addReaction(state, reaction);
+  }
+  if (target.dataset.action === "expand-post") {
+    expandedPostIds.add(target.dataset.postId);
+    renderFeed();
+    return;
+  }
+  if (target.dataset.action === "toggle-comments") {
+    const postId = target.dataset.postId;
+    if (openCommentPostIds.has(postId)) openCommentPostIds.delete(postId);
+    else openCommentPostIds.add(postId);
+    renderFeed();
+    return;
   }
   if (target.dataset.action === "download-file") {
     const url = target.dataset.url || target.href;
