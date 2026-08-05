@@ -64,6 +64,13 @@ async function setDesktopSetting(key, value) {
   localStorage.setItem(desktopSettingsKey, JSON.stringify(desktopSettings));
   return desktopSettings;
 }
+function withTimeout(promise, timeoutMs, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
 function updateDesktopUpdateStatus(text, disabled = false) {
   const status = byId("desktopUpdateStatus");
   const button = byId("desktopUpdateButton");
@@ -90,11 +97,19 @@ async function checkDesktopUpdate(options = {}) {
     }
     return info;
   } catch (error) {
-    if (!options.silent) updateDesktopUpdateStatus(error.message || "업데이트 확인에 실패했습니다.", false);
+    if (!options.silent) updateDesktopUpdateStatus(desktopUpdateErrorMessage(error), false);
     return null;
   } finally {
     desktopUpdateChecking = false;
   }
+}
+
+function desktopUpdateErrorMessage(error) {
+  const message = String(error?.message || error || "");
+  if (/204|status|fetch|network|endpoint|manifest|release|update/i.test(message)) {
+    return "업데이트 서버에 아직 새 버전 정보가 없습니다. 현재 설치된 버전을 사용하면 됩니다.";
+  }
+  return message || "업데이트 확인에 실패했습니다.";
 }
 
 async function installDesktopUpdate() {
@@ -116,13 +131,21 @@ async function requestBrowserNotificationPermission() {
   try { return (await Notification.requestPermission()) === "granted"; } catch { return false; }
 }
 async function notifyDesktop(title, body) {
-  if (!desktopSettings?.notificationsEnabled) return;
+  if (!desktopSettings?.notificationsEnabled) return { ok: false, error: "알림 받기가 꺼져 있습니다." };
   if (isDesktopApp()) {
-    try { await desktopInvoke("notify_desktop", { title, body }); return; } catch (error) { console.warn(error); }
+    try {
+      await withTimeout(desktopInvoke("notify_desktop", { title, body }), 2500, "Windows 알림 호출이 응답하지 않습니다.");
+      return { ok: true };
+    } catch (error) {
+      console.warn(error);
+      return { ok: false, error: error.message || "Windows 알림을 보낼 수 없습니다." };
+    }
   }
   if (await requestBrowserNotificationPermission()) {
     new Notification(title, { body, icon: "icons/icon.png" });
+    return { ok: true };
   }
+  return { ok: false, error: "브라우저 알림 권한이 꺼져 있습니다." };
 }
 function notifyForRemoteChanges(beforePostIds, beforeCommentIds) {
   if (!desktopSettings?.notificationsEnabled) return;
@@ -441,24 +464,38 @@ function bindNavigation() {
 }
 
 function bindDesktopSettings() {
+  byId("desktopNotificationTestButton")?.addEventListener("click", async () => {
+    const status = byId("desktopNotificationStatus");
+    const button = byId("desktopNotificationTestButton");
+    if (status) status.textContent = "알림 테스트 중...";
+    if (button) button.disabled = true;
+    const result = await notifyDesktop("BigHub 알림 테스트", "이 알림이 보이면 Windows 알림 연결이 정상입니다.");
+    if (status) status.textContent = result.ok ? "알림을 보냈습니다. Windows 알림 센터를 확인하세요." : `알림 실패: ${result.error || "알림을 보낼 수 없습니다."}`;
+    if (button) button.disabled = false;
+  });
   byId("desktopUpdateButton")?.addEventListener("click", async () => {
+    const settingsStatus = byId("desktopSettingsStatus");
+    if (settingsStatus) settingsStatus.textContent = "";
     const info = await checkDesktopUpdate();
     if (info?.available) await installDesktopUpdate();
   });
   document.querySelectorAll("[data-desktop-setting]").forEach((input) => {
     input.addEventListener("change", async () => {
       const status = byId("desktopSettingsStatus");
-      if (status) status.textContent = "\uC124\uC815 \uC800\uC7A5 \uC911...";
+      if (status) status.textContent = "설정 저장 중...";
       try {
         await setDesktopSetting(input.dataset.desktopSetting, input.checked);
         renderDesktopSettings();
+        if (status) status.textContent = "설정이 저장됐습니다.";
         if (input.dataset.desktopSetting === "notificationsEnabled" && input.checked) {
-          await notifyDesktop("BigHub \uC54C\uB9BC", "\uC0C8 \uAE00\uACFC \uB313\uAE00 \uC54C\uB9BC\uC774 \uCF1C\uC84C\uC2B5\uB2C8\uB2E4.");
+          const notificationStatus = byId("desktopNotificationStatus");
+          notifyDesktop("BigHub 알림", "새 글과 댓글 알림이 켜졌습니다.").then((result) => {
+            if (notificationStatus) notificationStatus.textContent = result.ok ? "알림을 보냈습니다. Windows 알림 센터를 확인하세요." : `설정은 저장됐지만 알림 테스트는 실패했습니다. ${result.error || ""}`;
+          });
         }
-        if (status) status.textContent = "\uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
       } catch (error) {
         input.checked = !input.checked;
-        if (status) status.textContent = error.message || "\uC124\uC815 \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.";
+        if (status) status.textContent = error.message || "설정 저장에 실패했습니다.";
       }
     });
   });

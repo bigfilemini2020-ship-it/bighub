@@ -95,6 +95,12 @@
                 <label class="setting-row"><span><strong>댓글 알림</strong><small>다른 사람이 댓글을 남기면 알립니다.</small></span><input type="checkbox" data-desktop-setting="notifyComments" /></label>
                 <label class="setting-row"><span><strong>미션 알림</strong><small>미션 게시글이 새로 올라오면 따로 알립니다.</small></span><input type="checkbox" data-desktop-setting="notifyMissions" /></label>
               </div>
+              <div class="settings-card">
+                <div class="setting-row">
+                  <span><strong>알림 테스트</strong><small id="desktopNotificationStatus">Windows 알림이 뜨는지 바로 확인합니다.</small></span>
+                  <button id="desktopNotificationTestButton" class="mini-button" type="button">알림 테스트</button>
+                </div>
+              </div>
               <div class="settings-card desktop-update-card">
                 <div class="setting-row">
                   <span><strong>앱 업데이트</strong><small id="desktopUpdateStatus">현재 설치된 데스크톱 앱 버전을 확인합니다.</small></span>
@@ -140,6 +146,6 @@
     <script src="supabase-config.js?v=supabase-2"></script>
     <script src="app-state.js?v=completion-users-1"></script>
     <script src="supabase-client.js?v=avatar-upload-1"></script>
-    <script src="app.js?v=notifications-1"></script>
+    <script src="app.js?v=notifications-2"></script>
   </body>
 </html>
