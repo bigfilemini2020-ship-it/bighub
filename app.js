@@ -199,8 +199,13 @@ function restoreFeedPosition() {
   if (!shouldRestoreFeedPosition || activeView !== "feed" || !currentUser()) return;
   shouldRestoreFeedPosition = false;
   const saved = readFeedPosition();
-  if (!saved || saved.userId !== currentUserId) return;
   requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (!saved || saved.userId !== currentUserId) {
+      const cards = Array.from(document.querySelectorAll(".feed-card[data-post-id]"));
+      const firstPost = cards[cards.length - 1];
+      if (firstPost) firstPost.scrollIntoView({ block: "start" });
+      return;
+    }
     const target = Array.from(document.querySelectorAll(".feed-card[data-post-id]")).find((card) => card.dataset.postId === saved.postId);
     if (target) {
       target.scrollIntoView({ block: "start" });
