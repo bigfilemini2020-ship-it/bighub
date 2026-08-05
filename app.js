@@ -538,7 +538,12 @@ function renderFeed() {
 }
 
 function sortFeedPosts(posts) {
-  return [...posts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return [...posts].sort((a, b) => {
+    const aIntro = a.title === "BigHub 사용 안내";
+    const bIntro = b.title === "BigHub 사용 안내";
+    if (aIntro !== bIntro) return aIntro ? 1 : -1;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
 
 function postCardHtml(post) {
