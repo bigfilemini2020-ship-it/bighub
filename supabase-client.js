@@ -208,6 +208,11 @@
     await saveMissionTargets(id, input.type === "mission" ? input.targetUserIds || [] : []);
   }
 
+  async function deletePost(id) {
+    const { error } = await client().from("posts").delete().eq("id", id);
+    if (error) throw new Error(userMessage(error, "게시글 삭제에 실패했습니다."));
+  }
+
   async function addReaction(input) {
     const auth = client();
     const { data: existing, error: selectError } = await auth.from("reactions").select("id").eq("post_id", input.postId).eq("user_id", input.userId).eq("sticker", input.sticker).maybeSingle();
@@ -240,5 +245,5 @@
     if (error) throw new Error(userMessage(error, "가입 승인 처리에 실패했습니다."));
   }
 
-  root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, listContent, createPost, updatePost, addReaction, addComment, deleteComment, recordFileDownload, approveProfile, accessToken };
+  root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, listContent, createPost, updatePost, deletePost, addReaction, addComment, deleteComment, recordFileDownload, approveProfile, accessToken };
 })(window);

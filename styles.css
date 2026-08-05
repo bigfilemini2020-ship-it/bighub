@@ -1584,3 +1584,58 @@ textarea {
   width: 16px;
   height: 16px;
 }
+
+.post-menu {
+  position: relative;
+}
+
+.post-menu-button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: #111827;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.post-menu-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.post-menu-popover {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  z-index: 20;
+  min-width: 132px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
+  overflow: hidden;
+}
+
+.post-menu-popover button {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  background: #fff;
+  color: #111827;
+  text-align: left;
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.post-menu-popover button:hover,
+.post-menu-popover button:focus-visible {
+  background: #f8fafc;
+}
+
+.post-menu-popover .danger {
+  color: #dc2626;
+  font-weight: 700;
+}

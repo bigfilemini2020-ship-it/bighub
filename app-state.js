@@ -99,6 +99,20 @@
     };
   }
 
+  function deletePost(state, postId, editorUserId) {
+    const editor = state.users.find((item) => item.id === editorUserId);
+    const post = state.posts.find((item) => item.id === postId);
+    if (!editor || !post || (editor.role !== "admin" && post.authorId !== editorUserId)) return state;
+    const commentIds = new Set(state.comments.filter((comment) => comment.postId === postId).map((comment) => comment.id));
+    return {
+      ...state,
+      posts: state.posts.filter((item) => item.id !== postId),
+      reactions: state.reactions.filter((reaction) => reaction.postId !== postId),
+      comments: state.comments.filter((comment) => comment.postId !== postId && !commentIds.has(comment.parentId)),
+      downloads: (state.downloads || []).filter((item) => item.postId !== postId),
+    };
+  }
+
   function addReaction(state, input, now = new Date().toISOString()) {
     const sticker = input.sticker || "like";
     const existing = state.reactions.find(
@@ -314,6 +328,7 @@
     createInitialState,
     addPost,
     updatePost,
+    deletePost,
     addReaction,
     addComment,
     deleteComment,

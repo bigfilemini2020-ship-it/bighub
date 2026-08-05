@@ -186,6 +186,9 @@ create policy "approved insert posts" on public.posts for insert to authenticate
 drop policy if exists "author or admin update posts" on public.posts;
 create policy "author or admin update posts" on public.posts for update to authenticated using (author_id = auth.uid() or public.is_admin()) with check (author_id = auth.uid() or public.is_admin());
 
+drop policy if exists "author or admin delete posts" on public.posts;
+create policy "author or admin delete posts" on public.posts for delete to authenticated using (author_id = auth.uid() or public.is_admin());
+
 drop policy if exists "approved select mission targets" on public.mission_targets;
 create policy "approved select mission targets" on public.mission_targets for select to authenticated using (public.is_approved());
 

@@ -5,6 +5,7 @@ const {
   createInitialState,
   addPost,
   updatePost,
+  deletePost,
   addReaction,
   addComment,
   deleteComment,
@@ -68,6 +69,27 @@ test("post author or admin can edit a post without losing activity", () => {
   assert.equal(state.comments.length, 1);
 });
 
+test("post author and admin can delete posts with related activity", () => {
+  let state = createInitialState(now);
+  state = addPost(state, { type: "general", title: "Mine", body: "body", authorId: "u-1" }, now);
+  const postId = state.posts[0].id;
+  state = addReaction(state, { postId, userId: "u-2", sticker: "done" }, now);
+  state = addComment(state, { postId, userId: "u-2", body: "comment" }, now);
+  state = recordFileDownload(state, { postId, userId: "u-2" }, now);
+
+  const blocked = deletePost(state, postId, "u-2");
+  assert.equal(blocked.posts.length, 1);
+
+  state = deletePost(state, postId, "u-1");
+  assert.equal(state.posts.length, 0);
+  assert.equal(state.reactions.length, 0);
+  assert.equal(state.comments.length, 0);
+  assert.equal(state.downloads.length, 0);
+
+  state = addPost(state, { type: "notice", title: "Admin delete", body: "body", authorId: "u-2" }, now);
+  state = deletePost(state, state.posts[0].id, "u-admin");
+  assert.equal(state.posts.length, 0);
+});
 test("non-author members cannot edit another user's post", () => {
   let state = createInitialState(now);
   state = addPost(state, { type: "general", title: "Keep", body: "body", authorId: "u-1" }, now);

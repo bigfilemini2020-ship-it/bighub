@@ -527,7 +527,8 @@ function renderMissionTargets() {
 
 function renderCurrentUser() { const item = currentUser(); const avatar = byId("currentAvatar"); avatar.classList.toggle("admin-icon", item.role === "admin"); avatar.textContent = item.role === "admin" ? "" : item.avatar || item.name.slice(0, 1); avatar.setAttribute("aria-label", item.role === "admin" ? "관리자" : item.name); byId("currentName").textContent = item.name; byId("currentRole").textContent = item.role === "admin" ? "admin" : `${item.department} · ${item.role}`; }
 
-function canEditPost(post) { const item = currentUser(); return Boolean(item && (item.role === "admin" || post.authorId === item.id)); }
+function canManagePost(post) { const item = currentUser(); return Boolean(item && (item.role === "admin" || post.authorId === item.id)); }
+function canEditPost(post) { return canManagePost(post); }
 function hasCompletionCheck(post) { return Array.isArray(post.completionRules) && post.completionRules.includes("done"); }
 
 function renderFeed() {
@@ -557,13 +558,17 @@ function postCardHtml(post) {
   const presentation = S.getPostPresentation(post);
   const cardClass = presentation.kind === "text" ? "feed-card text-card" : "feed-card media-card";
   const preview = presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post) : "";
-  const editButton = canEditPost(post) ? `<button class="post-edit-button" data-action="edit-post" data-post-id="${post.id}" type="button">수정</button>` : "";
+  const menuButton = canManagePost(post) ? postMenuHtml(post.id) : "";
   const doneLabel = post.type === "mission" ? `완료 ${doneCount}/${completion.totalMembers}` : `완료 ${doneCount}`;
   const doneAction = completionEnabled ? actionButton(post.id, "done", mine, "check", doneLabel) : "";
-  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${editButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<div class="feed-actions">${doneAction}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글 ${comments.length}</span></button>${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form></section></article>`;
+  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}"><header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${menuButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}<div class="feed-actions">${doneAction}<button class="icon-action comment" data-focus-comment="${post.id}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글 ${comments.length}</span></button>${saveControlHtml(post)}</div>${comments.length ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form></section></article>`;
 }
+function postMenuHtml(postId) {
+  return `<div class="post-menu"><button class="post-menu-button" data-action="toggle-post-menu" data-post-id="${postId}" type="button" aria-label="게시글 메뉴">${iconSvg("more")}</button><div class="post-menu-popover hidden" data-menu-for="${postId}"><button data-action="edit-post" data-post-id="${postId}" type="button">수정</button><button class="danger" data-action="delete-post" data-post-id="${postId}" type="button">삭제</button></div></div>`;
+}
+
 function actionButton(postId, sticker, mine, icon, label) { const active = mine.some((reaction) => reaction.sticker === sticker) ? " active" : ""; return `<button class="icon-action ${sticker}${active}" data-action="reaction" data-post-id="${postId}" data-sticker="${sticker}" type="button" title="${label}" aria-label="${label}">${iconSvg(icon)}<span>${label}</span></button>`; }
-function iconSvg(name) { const icons = { heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.2-4.4-9.5-9.1C.7 8.2 2.9 4.5 6.7 4.5c2 0 3.7 1.1 4.7 2.7 1-1.6 2.7-2.7 4.7-2.7 3.8 0 6 3.7 4.2 7.4C19.2 16.6 12 21 12 21Z"/></svg>`, check: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`, comment: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.4 9.6 9.6 0 0 1-4-.8L3 20l1.1-4.4A8.1 8.1 0 0 1 3 11.5C3 6.8 7 3 12 3s9 3.8 9 8.5Z"/></svg>`, download: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>` }; return icons[name] || name; }
+function iconSvg(name) { const icons = { heart: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.2-4.4-9.5-9.1C.7 8.2 2.9 4.5 6.7 4.5c2 0 3.7 1.1 4.7 2.7 1-1.6 2.7-2.7 4.7-2.7 3.8 0 6 3.7 4.2 7.4C19.2 16.6 12 21 12 21Z"/></svg>`, check: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`, comment: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.8 8.4 9.6 9.6 0 0 1-4-.8L3 20l1.1-4.4A8.1 8.1 0 0 1 3 11.5C3 6.8 7 3 12 3s9 3.8 9 8.5Z"/></svg>`, download: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>`, more: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>` }; return icons[name] || name; }
 function mediaPreviewHtml(url, post) {
   if (isDriveDownloadUrl(url) && isVideoAttachment(post)) {
     return `<div class="media-preview video-preview"><video class="drive-video" controls preload="metadata" playsinline data-drive-src="${escapeHtml(`${url}&inline=1`)}"></video></div>`;
@@ -615,7 +620,28 @@ document.addEventListener("click", async (event) => {
   if (replyTarget) { const form = replyTarget.closest(".comment")?.querySelector(".reply-form"); if (form) { form.classList.toggle("hidden"); form.querySelector("input")?.focus(); } return; }
   const target = event.target.closest("[data-action]");
   if (!target || target.tagName === "FORM") return;
+  if (target.dataset.action === "toggle-post-menu") {
+    const menu = document.querySelector(`[data-menu-for="${target.dataset.postId}"]`);
+    document.querySelectorAll(".post-menu-popover").forEach((item) => { if (item !== menu) item.classList.add("hidden"); });
+    if (menu) menu.classList.toggle("hidden");
+    return;
+  }
   if (target.dataset.action === "edit-post") { openEditModal(target.dataset.postId); return; }
+  if (target.dataset.action === "delete-post") {
+    const postId = target.dataset.postId;
+    const post = state.posts.find((item) => item.id === postId);
+    if (!post || !canManagePost(post)) return;
+    if (!confirm("이 게시글을 삭제할까요? 삭제하면 댓글과 완료 기록도 함께 삭제됩니다.")) return;
+    if (remoteAuth()) {
+      try { await window.BigHubSupabase.deletePost(postId); await refreshRemoteData(); }
+      catch (error) { alert(error.message || "게시글 삭제에 실패했습니다."); return; }
+    } else {
+      state = S.deletePost(state, postId, currentUserId);
+      saveState();
+    }
+    render();
+    return;
+  }
   if (target.dataset.action === "reaction") {
     const reaction = { postId: target.dataset.postId, userId: currentUserId, sticker: target.dataset.sticker };
     if (remoteAuth()) {
