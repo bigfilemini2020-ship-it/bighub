@@ -5,6 +5,7 @@ const autoLoginKey = "bighub-auto-login";
 const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
+const webAppVersion = "2026.08.05-version-notification-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -20,6 +21,23 @@ let desktopSettings = null;
 let desktopNotificationsArmed = false;
 let desktopUpdateInfo = null;
 let desktopUpdateChecking = false;
+let desktopAppVersion = "";
+
+async function loadDesktopAppVersion() {
+  if (!isDesktopApp()) return;
+  try {
+    desktopAppVersion = await desktopInvoke("get_desktop_app_version");
+  } catch (error) {
+    console.warn(error);
+  }
+}
+
+function renderVersionStatus() {
+  const status = byId("desktopVersionStatus");
+  if (!status) return;
+  const desktopText = isDesktopApp() ? `데스크톱 v${desktopAppVersion || "확인 중"}` : "웹 브라우저";
+  status.textContent = `${desktopText} / ? ${webAppVersion}`;
+}
 const notificationPollIntervalMs = 10000;
 let expandedPostIds = new Set();
 let openCommentPostIds = new Set();
@@ -85,6 +103,8 @@ async function checkDesktopUpdate(options = {}) {
   try {
     const info = await desktopInvoke("check_desktop_update");
     desktopUpdateInfo = info;
+    if (info?.currentVersion) desktopAppVersion = info.currentVersion;
+    renderVersionStatus();
     if (info?.available) {
       const version = info.version || "새 버전";
       updateDesktopUpdateStatus(`${version} 업데이트가 있습니다.`, false);
@@ -257,6 +277,7 @@ async function init() {
   bindForms();
   bindDesktopSettings();
   await loadDesktopSettings();
+  await loadDesktopAppVersion();
   setTimeout(() => checkDesktopUpdate({ silent: true }), 2500);
   if (remoteAuth()) await restoreRemoteSession();
   applySavedFeedFilter();
@@ -494,27 +515,22 @@ function bindDesktopSettings() {
       try {
         await setDesktopSetting(input.dataset.desktopSetting, input.checked);
         renderDesktopSettings();
-        if (status) status.textContent = "설정이 저장됐습니다.";
         if (input.dataset.desktopSetting === "notificationsEnabled" && input.checked) {
+          if (status) status.textContent = "설정이 저장됐습니다. 알림을 확인하는 중...";
           const notificationStatus = byId("desktopNotificationStatus");
           notifyDesktop("BigHub 알림", "새 글과 댓글 알림이 켜졌습니다.").then((result) => {
-            if (notificationStatus) notificationStatus.textContent = result.ok ? "알림을 보냈습니다. Windows 알림 센터를 확인하세요." : `설정은 저장됐지만 알림 테스트는 실패했습니다. ${result.error || ""}`;
+            if (status) status.textContent = result.ok ? "알림 받기가 켜졌습니다." : `설정은 저장됐지만 Windows 알림이 뜨지 않았습니다. ${result.error || ""}`;
+            if (notificationStatus) notificationStatus.textContent = result.ok ? "알림을 보냈습니다. Windows 알림 센터를 확인하세요." : `알림 실패: ${result.error || "알림을 보낼 수 없습니다."}`;
           });
+        } else {
+          if (status) status.textContent = "설정이 저장됐습니다.";
         }
       } catch (error) {
         input.checked = !input.checked;
-        if (status) status.textContent = error.message || "설정 저장에 실패했습니다.";
+        renderDesktopSettings();
+        if (status) status.textContent = "설정 저장에 실패했습니다.";
       }
     });
-  });
-}
-
-function renderDesktopSettings() {
-  const button = byId("desktopSettingsButton");
-  if (button) button.classList.toggle("hidden", !isDesktopApp());
-  if (!desktopSettings) return;
-  document.querySelectorAll("[data-desktop-setting]").forEach((input) => {
-    input.checked = Boolean(desktopSettings[input.dataset.desktopSetting]);
   });
 }
 
@@ -915,6 +931,16 @@ function bindForms() {
     } finally {
       if (submitButton) submitButton.disabled = false;
     }
+  });
+}
+
+function renderDesktopSettings() {
+  const button = byId("desktopSettingsButton");
+  if (button) button.classList.toggle("hidden", !isDesktopApp());
+  renderVersionStatus();
+  if (!desktopSettings) return;
+  document.querySelectorAll("[data-desktop-setting]").forEach((input) => {
+    input.checked = Boolean(desktopSettings[input.dataset.desktopSetting]);
   });
 }
 

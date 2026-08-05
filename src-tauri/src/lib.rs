@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, sync::Mutex};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
+    plugin::PermissionState,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, State, WindowEvent,
 };
@@ -110,6 +111,11 @@ fn create_tray(app: &AppHandle) -> tauri::Result<()> {
 }
 
 #[tauri::command]
+fn get_desktop_app_version(app: AppHandle) -> String {
+    app.package_info().version.to_string()
+}
+
+#[tauri::command]
 fn get_desktop_settings(app: AppHandle, state: State<SettingsState>) -> Result<DesktopSettings, String> {
     let mut settings = state
         .0
@@ -200,6 +206,13 @@ async fn install_desktop_update(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn notify_desktop(app: AppHandle, title: String, body: String) -> Result<(), String> {
+    let permission = app
+        .notification()
+        .request_permission()
+        .map_err(|error| error.to_string())?;
+    if permission != PermissionState::Granted {
+        return Err("Windows notification permission is not granted.".to_string());
+    }
     app.notification()
         .builder()
         .title(title)
@@ -231,6 +244,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            get_desktop_app_version,
             get_desktop_settings,
             set_desktop_setting,
             notify_desktop,
