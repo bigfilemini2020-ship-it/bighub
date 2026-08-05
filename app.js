@@ -756,6 +756,34 @@ function saveControlHtml(post) {
   }
   return `<a class="save-link" href="${safeUrl}" target="_blank" rel="noreferrer" title="열기" data-action="download-file" data-post-id="${post.id}" data-url="${safeUrl}">${iconSvg("download")}</a>`;
 }
+function setDriveFiles(files) {
+  const input = byId("driveFileInput");
+  if (!input || !files?.length) return;
+  const transfer = new DataTransfer();
+  files.forEach((file) => transfer.items.add(file));
+  input.files = transfer.files;
+  updateDriveFileStatus();
+}
+
+function bindDriveDropZone() {
+  const dropZone = document.querySelector(".upload-drop");
+  if (!dropZone || dropZone.dataset.dropBound === "1") return;
+  dropZone.dataset.dropBound = "1";
+  ["dragenter", "dragover"].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropZone.classList.add("drag-over");
+    });
+  });
+  ["dragleave", "drop"].forEach((eventName) => {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      if (eventName === "drop") setDriveFiles(Array.from(event.dataTransfer?.files || []));
+      if (!dropZone.contains(event.relatedTarget)) dropZone.classList.remove("drag-over");
+    });
+  });
+}
+
 function updateMissionSettings() {
   const type = byId("postTypeSelect")?.value;
   const settings = byId("missionSettings");
@@ -766,6 +794,7 @@ function bindForms() {
   renderMissionTargets();
   updateMissionSettings();
   byId("postTypeSelect")?.addEventListener("change", updateMissionSettings);
+  bindDriveDropZone();
   byId("driveFileInput")?.addEventListener("change", updateDriveFileStatus);
   byId("postForm").addEventListener("submit", async (event) => {
     event.preventDefault();

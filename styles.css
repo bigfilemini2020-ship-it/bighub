@@ -2151,3 +2151,9 @@ textarea {
   fill: none;
   stroke-width: 2;
 }
+
+.upload-drop.drag-over {
+  border-color: var(--primary);
+  background: #f5f8ff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10) inset;
+}
