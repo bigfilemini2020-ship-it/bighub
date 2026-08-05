@@ -14,6 +14,7 @@ let editingPostId = "";
 let uploadedAttachment = null;
 let shouldRestoreFeedPosition = true;
 let feedPositionSaveTimer = 0;
+let remoteSyncInFlight = false;
 
 function loadState() {
   const saved = localStorage.getItem(storeKey);
@@ -126,6 +127,18 @@ async function tryRefreshRemoteData() {
   }
 }
 
+async function syncRemoteData() {
+  if (!remoteAuth() || !currentUser() || remoteSyncInFlight) return;
+  remoteSyncInFlight = true;
+  try {
+    const error = await tryRefreshRemoteData();
+    if (error) console.warn(error);
+    else render();
+  } finally {
+    remoteSyncInFlight = false;
+  }
+}
+
 function setupAuthForms() {
   const savedId = localStorage.getItem(rememberedLoginIdKey) || "";
   byId("loginIdInput").value = savedId;
@@ -200,6 +213,9 @@ function bindNavigation() {
   document.querySelectorAll(".filter-chip").forEach((button) => button.addEventListener("click", () => { postFilter = button.dataset.filter; saveFeedPosition(); renderFeed(); }));
   window.addEventListener("scroll", scheduleSaveFeedPosition, { passive: true });
   window.addEventListener("beforeunload", saveFeedPosition);
+  window.addEventListener("focus", syncRemoteData);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) syncRemoteData(); });
+  window.setInterval(syncRemoteData, 30000);
   byId("globalSearch").addEventListener("input", renderSearch);
   byId("logoutButton").addEventListener("click", async () => { if (remoteAuth()) await window.BigHubSupabase.signOut(); currentUserId = ""; clearSession(); render(); });
   byId("resetDemo").addEventListener("click", () => { localStorage.removeItem(storeKey); clearSession(); state = loadState(); currentUserId = ""; render(); });
