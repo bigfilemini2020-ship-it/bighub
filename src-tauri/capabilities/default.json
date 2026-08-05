@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "BigHub remote web app access",
+  "windows": ["main"],
+  "remote": {
+    "urls": [
+      "https://bighub-tau.vercel.app/**",
+      "https://*.supabase.co/**",
+      "https://*.googleapis.com/**",
+      "https://*.googleusercontent.com/**",
+      "https://drive.google.com/**"
+    ]
+  },
+  "permissions": ["core:default"]
+}
