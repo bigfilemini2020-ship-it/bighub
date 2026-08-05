@@ -303,6 +303,14 @@ function hasActiveCommentDraft() {
   return fields.some((field) => field === document.activeElement && field.value.trim());
 }
 
+function hasActiveMediaPlayback() {
+  return Array.from(document.querySelectorAll("video, audio")).some((media) => !media.paused && !media.ended);
+}
+
+function shouldDeferRemoteRender() {
+  return hasActiveCommentDraft() || hasActiveMediaPlayback() || Boolean(document.fullscreenElement || document.pictureInPictureElement);
+}
+
 async function syncRemoteData() {
   if (!remoteAuth() || !currentUser() || remoteSyncInFlight) return;
   remoteSyncInFlight = true;
@@ -314,7 +322,7 @@ async function syncRemoteData() {
     else {
       if (desktopNotificationsArmed) notifyForRemoteChanges(beforePostIds, beforeCommentIds);
       desktopNotificationsArmed = true;
-      if (!hasActiveCommentDraft()) render();
+      if (!shouldDeferRemoteRender()) render();
     }
   } finally {
     remoteSyncInFlight = false;
