@@ -8,6 +8,7 @@
     "devUrl": "https://bighub-tau.vercel.app"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "label": "main",

@@ -1932,3 +1932,64 @@ textarea {
   line-height: 1;
   font-size: 14px;
 }
+
+.settings-panel {
+  display: grid;
+  gap: 18px;
+  width: min(100%, 620px);
+  margin: 0 auto;
+}
+
+.settings-head h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+
+.settings-head p,
+.settings-status {
+  margin: 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+.settings-card {
+  border: 1px solid #dbe2ea;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.setting-row:last-child {
+  border-bottom: 0;
+}
+
+.setting-row span {
+  display: grid;
+  gap: 4px;
+}
+
+.setting-row strong {
+  font-size: 15px;
+  color: #101828;
+}
+
+.setting-row small {
+  color: #667085;
+  line-height: 1.45;
+}
+
+.setting-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #101828;
+  flex: 0 0 auto;
+}

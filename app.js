@@ -4,6 +4,7 @@ const rememberedLoginIdKey = "bighub-remembered-login-id";
 const autoLoginKey = "bighub-auto-login";
 const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
+const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -15,6 +16,8 @@ let uploadedAttachment = null;
 let shouldRestoreFeedPosition = true;
 let feedPositionSaveTimer = 0;
 let remoteSyncInFlight = false;
+let desktopSettings = null;
+let desktopNotificationsArmed = false;
 
 function loadState() {
   const saved = localStorage.getItem(storeKey);
@@ -25,6 +28,64 @@ function loadState() {
 function saveState() { if (!remoteAuth()) localStorage.setItem(storeKey, JSON.stringify(state)); }
 function remoteAuth() { return window.BigHubSupabase && window.BigHubSupabase.isConfigured(); }
 function byId(id) { return document.getElementById(id); }
+function isDesktopApp() { return Boolean(window.__TAURI__?.core?.invoke); }
+async function desktopInvoke(command, args = {}) { return window.__TAURI__.core.invoke(command, args); }
+function cachedDesktopSettings() {
+  try { return JSON.parse(localStorage.getItem(desktopSettingsKey) || "null"); } catch { return null; }
+}
+async function loadDesktopSettings() {
+  desktopSettings = cachedDesktopSettings() || {
+    minimizeToTray: true,
+    autostart: false,
+    notificationsEnabled: true,
+    notifyPosts: true,
+    notifyComments: true,
+    notifyMissions: true,
+  };
+  if (!isDesktopApp()) return desktopSettings;
+  try {
+    desktopSettings = await desktopInvoke("get_desktop_settings");
+    localStorage.setItem(desktopSettingsKey, JSON.stringify(desktopSettings));
+  } catch (error) {
+    console.warn(error);
+  }
+  return desktopSettings;
+}
+async function setDesktopSetting(key, value) {
+  desktopSettings = { ...(desktopSettings || {}), [key]: value };
+  localStorage.setItem(desktopSettingsKey, JSON.stringify(desktopSettings));
+  if (!isDesktopApp()) return desktopSettings;
+  desktopSettings = await desktopInvoke("set_desktop_setting", { key, value });
+  localStorage.setItem(desktopSettingsKey, JSON.stringify(desktopSettings));
+  return desktopSettings;
+}
+async function notifyDesktop(title, body) {
+  if (!isDesktopApp() || !desktopSettings?.notificationsEnabled) return;
+  try { await desktopInvoke("notify_desktop", { title, body }); } catch (error) { console.warn(error); }
+}
+function notifyForRemoteChanges(beforePostIds, beforeCommentIds) {
+  if (!desktopSettings?.notificationsEnabled) return;
+  const myId = currentUserId;
+  const newPosts = state.posts.filter((post) => !beforePostIds.has(post.id) && post.authorId !== myId);
+  const mission = newPosts.find((post) => post.type === "mission");
+  const regular = newPosts.find((post) => post.type !== "mission");
+  if (mission && desktopSettings.notifyMissions) {
+    notifyDesktop("BigHub \uC0C8 \uBBF8\uC158", mission.title || "\uC0C8 \uBBF8\uC158\uC774 \uB4F1\uB85D\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+    return;
+  }
+  if (regular && desktopSettings.notifyPosts) {
+    notifyDesktop("BigHub \uC0C8 \uAC8C\uC2DC\uAE00", regular.title || "\uC0C8 \uAC8C\uC2DC\uAE00\uC774 \uB4F1\uB85D\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+    return;
+  }
+  if (desktopSettings.notifyComments) {
+    const comment = state.comments.find((item) => !beforeCommentIds.has(item.id) && item.userId !== myId);
+    if (comment) {
+      const post = state.posts.find((item) => item.id === comment.postId);
+      const body = `${userName(comment.userId)}: ${comment.body || post?.title || "\uB313\uAE00\uC774 \uB4F1\uB85D\uB418\uC5C8\uC2B5\uB2C8\uB2E4."}`.slice(0, 90);
+      notifyDesktop("BigHub \uC0C8 \uB313\uAE00", body);
+    }
+  }
+}
 function escapeHtml(value) { return String(value || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
 function user(userId) { return state.users.find((item) => item.id === userId) || state.users[0]; }
 function userName(userId) { return user(userId).name; }
@@ -105,6 +166,8 @@ async function init() {
   bindAuthForms();
   bindNavigation();
   bindForms();
+  bindDesktopSettings();
+  await loadDesktopSettings();
   if (remoteAuth()) await restoreRemoteSession();
   applySavedFeedFilter();
   render();
@@ -154,9 +217,15 @@ async function syncRemoteData() {
   if (!remoteAuth() || !currentUser() || remoteSyncInFlight) return;
   remoteSyncInFlight = true;
   try {
+    const beforePostIds = new Set(state.posts.map((post) => post.id));
+    const beforeCommentIds = new Set(state.comments.map((comment) => comment.id));
     const error = await tryRefreshRemoteData();
     if (error) console.warn(error);
-    else if (!hasActiveCommentDraft()) render();
+    else {
+      if (desktopNotificationsArmed) notifyForRemoteChanges(beforePostIds, beforeCommentIds);
+      desktopNotificationsArmed = true;
+      if (!hasActiveCommentDraft()) render();
+    }
   } finally {
     remoteSyncInFlight = false;
   }
@@ -304,6 +373,36 @@ function bindNavigation() {
   byId("resetDemo").addEventListener("click", () => { localStorage.removeItem(storeKey); clearSession(); state = loadState(); currentUserId = ""; render(); });
 }
 
+function bindDesktopSettings() {
+  document.querySelectorAll("[data-desktop-setting]").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const status = byId("desktopSettingsStatus");
+      if (status) status.textContent = "\uC124\uC815 \uC800\uC7A5 \uC911...";
+      try {
+        await setDesktopSetting(input.dataset.desktopSetting, input.checked);
+        renderDesktopSettings();
+        if (status) status.textContent = "\uC124\uC815\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.";
+      } catch (error) {
+        input.checked = !input.checked;
+        if (status) status.textContent = error.message || "\uC124\uC815 \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.";
+      }
+    });
+  });
+}
+
+function renderDesktopSettings() {
+  const button = byId("desktopSettingsButton");
+  if (button) button.classList.toggle("hidden", !isDesktopApp());
+  if (!desktopSettings) return;
+  document.querySelectorAll("[data-desktop-setting]").forEach((input) => {
+    input.checked = Boolean(desktopSettings[input.dataset.desktopSetting]);
+  });
+}
+
+window.BigHubDesktopOpenSettings = () => {
+  activeView = "settings";
+  render();
+};
 function openComposeModal() {
   if (!currentUser()) return;
   editingPostId = "";
@@ -594,11 +693,13 @@ function render() {
   if (!signedIn) return;
   const admin = currentUser()?.role === "admin";
   byId("approvalMenuButton").classList.toggle("hidden", !admin);
+  byId("desktopSettingsButton")?.classList.toggle("hidden", !isDesktopApp());
   if (activeView === "approvals" && !admin) activeView = "feed";
+  if (activeView === "settings" && !isDesktopApp()) activeView = "feed";
   document.querySelectorAll(".rail-button[data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === activeView));
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
   byId(`${activeView}View`).classList.add("active");
-  renderCurrentUser(); renderFeed(); renderSearch(); renderProgress(); renderStats(); renderApprovals(); renderCalendar(); restoreFeedPosition();
+  renderCurrentUser(); renderFeed(); renderSearch(); renderProgress(); renderStats(); renderApprovals(); renderCalendar(); renderDesktopSettings(); restoreFeedPosition();
 }
 
 function renderMissionTargets() {
