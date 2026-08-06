@@ -1146,6 +1146,16 @@ textarea {
   pointer-events: none;
 }
 
+.clear-attachment-button {
+  margin-left: 8px;
+  border: 0;
+  background: transparent;
+  color: #dc2626;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .upload-status {
   display: grid;
   gap: 6px;

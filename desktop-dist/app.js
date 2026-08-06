@@ -14,6 +14,7 @@ let activeView = "feed";
 let postFilter = "all";
 let editingPostId = "";
 let uploadedAttachments = [];
+let removeExistingAttachment = false;
 let shouldRestoreFeedPosition = true;
 let feedPositionSaveTimer = 0;
 let remoteSyncInFlight = false;
@@ -574,6 +575,7 @@ function openComposeModal() {
   const form = byId("postForm");
   form.reset();
   uploadedAttachments = [];
+  removeExistingAttachment = false;
   byId("composeTitle").textContent = "새 게시물 만들기";
   byId("driveUploadStatus").textContent = "";
   updateMissionSettings();
@@ -594,10 +596,11 @@ function openEditModal(postId) {
   form.elements.dueDate.value = post.dueDate || "";
   form.elements.mediaUrl.value = post.mediaUrl || "";
   form.elements.attachmentUrl.value = isAttachmentBundle(post.attachmentUrl) ? "" : post.attachmentUrl || "";
+  removeExistingAttachment = false;
   formDataCheckAll(form, "targetUserIds", post.targetUserIds || []);
   formDataCheckAll(form, "completionRules", post.completionRules || []);
   byId("composeTitle").textContent = "게시물 수정";
-  byId("driveUploadStatus").textContent = attachmentList(post).length ? `현재 첨부: ${attachmentList(post).length}개` : "";
+  renderExistingAttachmentStatus(post);
   updateMissionSettings();
   byId("composeModal").classList.remove("hidden");
   form.querySelector("input[name='title']").focus();
@@ -609,7 +612,7 @@ function formDataCheckAll(form, name, values) {
   Array.from(form.querySelectorAll(`input[name='${name}']`)).forEach((input) => { input.checked = selected.has(input.value); });
 }
 
-function closeComposeModal() { byId("composeModal").classList.add("hidden"); editingPostId = ""; uploadedAttachments = []; }
+function closeComposeModal() { byId("composeModal").classList.add("hidden"); editingPostId = ""; uploadedAttachments = []; removeExistingAttachment = false; }
 function formatFileSize(bytes) {
   const size = Number(bytes) || 0;
   if (size < 1024) return `${size}B`;
@@ -660,13 +663,24 @@ function clearUploadedAttachments() {
   sessionStorage.removeItem(uploadedAttachmentKey);
 }
 
+function renderExistingAttachmentStatus(post) {
+  const status = byId("driveUploadStatus");
+  if (!status) return;
+  const count = attachmentList(post).length;
+  if (!editingPostId || !count) { status.textContent = ""; return; }
+  if (removeExistingAttachment) { status.textContent = "현재 첨부 제거 예정"; return; }
+  status.innerHTML = `현재 첨부: ${count}개 <button class="clear-attachment-button" data-action="remove-existing-attachment" type="button">첨부 제거</button>`;
+}
+
 function updateDriveFileStatus() {
   const files = selectedDriveFiles();
   const status = byId("driveUploadStatus");
   if (!status) return;
   if (!files.length) {
     clearUploadedAttachments();
-    status.textContent = "";
+    const existingPost = editingPostId ? state.posts.find((post) => post.id === editingPostId) : null;
+    if (existingPost && !removeExistingAttachment) renderExistingAttachmentStatus(existingPost);
+    else status.textContent = "";
     return;
   }
   loadUploadedAttachments(files);
@@ -933,9 +947,14 @@ function bindForms() {
       }
       const manualAttachments = manualAttachmentUrl ? [{ url: manualAttachmentUrl, name: driveFileName(manualAttachmentUrl), mimeType: "" }] : [];
       const existingPost = editingPostId ? state.posts.find((post) => post.id === editingPostId) : null;
+      const existingIsBundle = existingPost && isAttachmentBundle(existingPost.attachmentUrl);
+      const existingSingleUrl = existingPost && !existingIsBundle ? String(existingPost.attachmentUrl || "").trim() : "";
+      const singleAttachmentCleared = Boolean(editingPostId && existingSingleUrl && !manualAttachmentUrl && !files.length);
       const nextAttachments = [...uploadedFileAttachments, ...manualAttachments];
       if (nextAttachments.length) Object.assign(data, attachmentPayload(nextAttachments));
-      else if (existingPost) Object.assign(data, attachmentPayload(attachmentList(existingPost)));
+      else if (removeExistingAttachment || singleAttachmentCleared) Object.assign(data, attachmentPayload([]));
+      else if (existingPost && existingIsBundle) Object.assign(data, attachmentPayload(attachmentList(existingPost)));
+      else Object.assign(data, attachmentPayload([]));
       delete data.driveFile;
       data.targetUserIds = data.type === "mission" ? formData.getAll("targetUserIds") : [];
       data.completionRules = formData.getAll("completionRules");
@@ -950,6 +969,7 @@ function bindForms() {
       }
       form.reset();
       clearUploadedAttachments();
+      removeExistingAttachment = false;
       setUploadStatus("");
       closeComposeModal();
       activeView = "feed";
@@ -1141,6 +1161,17 @@ document.addEventListener("click", async (event) => {
     const menu = document.querySelector(`[data-menu-for="${target.dataset.postId}"]`);
     document.querySelectorAll(".post-menu-popover").forEach((item) => { if (item !== menu) item.classList.add("hidden"); });
     if (menu) menu.classList.toggle("hidden");
+    return;
+  }
+  if (target.dataset.action === "remove-existing-attachment") {
+    removeExistingAttachment = true;
+    const input = byId("driveFileInput");
+    if (input) input.value = "";
+    const form = byId("postForm");
+    if (form?.elements?.attachmentUrl) form.elements.attachmentUrl.value = "";
+    clearUploadedAttachments();
+    const status = byId("driveUploadStatus");
+    if (status) status.textContent = "현재 첨부 제거 예정";
     return;
   }
   if (target.dataset.action === "edit-post") { openEditModal(target.dataset.postId); return; }
