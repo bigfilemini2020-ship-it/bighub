@@ -299,7 +299,7 @@
     if (youtubeId) {
       return {
         type: "youtube",
-        embedUrl: `https://www.youtube.com/embed/${youtubeId}`,
+        embedUrl: `https://www.youtube-nocookie.com/embed/${youtubeId}`,
         thumbnailUrl: `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`,
       };
     }

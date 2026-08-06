@@ -1084,7 +1084,7 @@ function mediaPreviewHtml(url, post) {
     return `<div class="media-preview image-preview"><img class="drive-image" data-drive-src="${escapeHtml(`${url}&inline=1`)}" alt="${escapeHtml(post.title)}" loading="lazy" /></div>`;
   }
   const preview = S.getLinkPreview(url);
-  if (preview.type === "youtube") return `<a class="media-preview" href="${escapeHtml(url)}" target="_blank" rel="noreferrer"><img src="${escapeHtml(preview.thumbnailUrl)}" alt="${escapeHtml(post.title)} 썸네일" /></a>`;
+  if (preview.type === "youtube") return `<div class="media-preview youtube-preview"><iframe src="${escapeHtml(preview.embedUrl)}" title="${escapeHtml(post.title)}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>`;
   if (preview.type === "image") return `<a class="media-preview" href="${escapeHtml(url)}" target="_blank" rel="noreferrer"><img src="${escapeHtml(url)}" alt="${escapeHtml(post.title)}" /></a>`;
   const label = preview.type === "html" ? "HTML" : "LINK";
   return `<a class="media-preview" href="${escapeHtml(url)}" target="_blank" rel="noreferrer"><div class="file-preview"><div class="file-icon">${label}</div><strong>${escapeHtml(post.title)}</strong><span>열어서 보기</span></div></a>`;
