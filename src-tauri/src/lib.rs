@@ -1,12 +1,13 @@
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf, sync::Mutex};
+use std::{fs, io::Write, path::PathBuf, sync::Mutex};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     plugin::PermissionState,
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, State, WindowEvent,
+    AppHandle, Manager, State, UserAttentionType, WindowEvent,
 };
 use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_updater::UpdaterExt;
 
@@ -19,6 +20,7 @@ struct DesktopSettings {
     notify_posts: bool,
     notify_comments: bool,
     notify_missions: bool,
+    download_dir: Option<String>,
 }
 
 impl Default for DesktopSettings {
@@ -30,6 +32,7 @@ impl Default for DesktopSettings {
             notify_posts: true,
             notify_comments: true,
             notify_missions: true,
+            download_dir: None,
         }
     }
 }
@@ -44,6 +47,66 @@ struct DesktopUpdateInfo {
     version: Option<String>,
     notes: Option<String>,
     date: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DriveDownloadOutput {
+    path: String,
+}
+
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveDownloadedFileInput {
+    name: String,
+    data: Vec<u8>,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ClientLogInput {
+    line: String,
+}
+
+
+
+fn sanitize_file_name(name: &str) -> String {
+    let cleaned = name
+        .chars()
+        .map(|ch| match ch {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            ch if ch.is_control() => '_',
+            ch => ch,
+        })
+        .collect::<String>()
+        .trim()
+        .trim_matches('.')
+        .to_string();
+    if cleaned.is_empty() { "download".to_string() } else { cleaned }
+}
+
+fn unique_download_path(dir: PathBuf, file_name: &str) -> PathBuf {
+    let safe = sanitize_file_name(file_name);
+    let candidate = dir.join(&safe);
+    if !candidate.exists() {
+        return candidate;
+    }
+    let path = std::path::Path::new(&safe);
+    let stem = path.file_stem().and_then(|value| value.to_str()).unwrap_or("download");
+    let ext = path.extension().and_then(|value| value.to_str()).unwrap_or("");
+    for index in 1..1000 {
+        let name = if ext.is_empty() {
+            format!("{stem} ({index})")
+        } else {
+            format!("{stem} ({index}).{ext}")
+        };
+        let candidate = dir.join(name);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    dir.join(safe)
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
@@ -66,6 +129,15 @@ fn save_settings(app: &AppHandle, settings: &DesktopSettings) -> Result<(), Stri
     fs::write(path, text).map_err(|error| error.to_string())
 }
 
+fn configured_download_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let settings = load_settings(app);
+    if let Some(dir) = settings.download_dir.as_deref().map(str::trim).filter(|value| !value.is_empty()) {
+        let path = PathBuf::from(dir);
+        fs::create_dir_all(&path).map_err(|error| format!("다운로드 폴더를 사용할 수 없습니다. {error}"))?;
+        return Ok(path);
+    }
+    app.path().download_dir().map_err(|error| error.to_string())
+}
 fn show_main(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -75,9 +147,9 @@ fn show_main(app: &AppHandle) {
 }
 
 fn create_tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItemBuilder::with_id("open", "BigHub 열기").build(app)?;
-    let settings = MenuItemBuilder::with_id("settings", "설정 열기").build(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "완전 종료").build(app)?;
+    let open = MenuItemBuilder::with_id("open", "BigHub \u{C5F4}\u{AE30}").build(app)?;
+    let settings = MenuItemBuilder::with_id("settings", "\u{C124}\u{C815} \u{C5F4}\u{AE30}").build(app)?;
+    let quit = MenuItemBuilder::with_id("quit", "\u{C644}\u{C804} \u{C885}\u{B8CC}").build(app)?;
     let menu = MenuBuilder::new(app).items(&[&open, &settings, &quit]).build()?;
 
     TrayIconBuilder::with_id("main-tray")
@@ -120,7 +192,7 @@ fn get_desktop_settings(app: AppHandle, state: State<SettingsState>) -> Result<D
     let mut settings = state
         .0
         .lock()
-        .map_err(|_| "설정을 읽지 못했습니다.".to_string())?
+        .map_err(|_| "?ㅼ젙???쎌? 紐삵뻽?듬땲??".to_string())?
         .clone();
     if let Ok(enabled) = app.autolaunch().is_enabled() {
         settings.autostart = enabled;
@@ -138,7 +210,7 @@ fn set_desktop_setting(
     let mut settings = state
         .0
         .lock()
-        .map_err(|_| "설정을 저장하지 못했습니다.".to_string())?;
+        .map_err(|_| "?ㅼ젙????ν븯吏 紐삵뻽?듬땲??".to_string())?;
 
     match key.as_str() {
         "minimizeToTray" => settings.minimize_to_tray = value,
@@ -154,13 +226,27 @@ fn set_desktop_setting(
         "notifyPosts" => settings.notify_posts = value,
         "notifyComments" => settings.notify_comments = value,
         "notifyMissions" => settings.notify_missions = value,
-        _ => return Err("알 수 없는 설정입니다.".to_string()),
+        _ => return Err("?????녿뒗 ?ㅼ젙?낅땲??".to_string()),
     }
 
     save_settings(&app, &settings)?;
     Ok(settings.clone())
 }
 
+#[tauri::command]
+fn choose_download_dir(app: AppHandle, state: State<SettingsState>) -> Result<DesktopSettings, String> {
+    let Some(folder) = app.dialog().file().blocking_pick_folder() else {
+        return get_desktop_settings(app, state);
+    };
+    let path = folder.into_path().map_err(|error| error.to_string())?;
+    let mut settings = state
+        .0
+        .lock()
+        .map_err(|_| "설정을 저장하지 못했습니다.".to_string())?;
+    settings.download_dir = Some(path.to_string_lossy().to_string());
+    save_settings(&app, &settings)?;
+    Ok(settings.clone())
+}
 #[tauri::command]
 async fn check_desktop_update(app: AppHandle) -> Result<DesktopUpdateInfo, String> {
     let updater = app.updater().map_err(|error| error.to_string())?;
@@ -194,7 +280,7 @@ async fn install_desktop_update(app: AppHandle) -> Result<(), String> {
         .await
         .map_err(|error| error.to_string())?
     else {
-        return Err("설치할 업데이트가 없습니다.".to_string());
+        return Err("?ㅼ튂???낅뜲?댄듃媛 ?놁뒿?덈떎.".to_string());
     };
 
     update
@@ -204,6 +290,14 @@ async fn install_desktop_update(app: AppHandle) -> Result<(), String> {
     app.restart()
 }
 
+fn request_taskbar_attention(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let visible = window.is_visible().unwrap_or(true);
+        if visible {
+            let _ = window.request_user_attention(Some(UserAttentionType::Informational));
+        }
+    }
+}
 #[tauri::command]
 fn notify_desktop(app: AppHandle, title: String, body: String) -> Result<(), String> {
     let permission = app
@@ -218,13 +312,41 @@ fn notify_desktop(app: AppHandle, title: String, body: String) -> Result<(), Str
         .title(title)
         .body(body)
         .show()
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    request_taskbar_attention(&app);
+    Ok(())
 }
 
+#[tauri::command]
+async fn save_downloaded_file(app: AppHandle, input: SaveDownloadedFileInput) -> Result<DriveDownloadOutput, String> {
+    let download_dir = configured_download_dir(&app)?;
+    let path = unique_download_path(download_dir, &input.name);
+    fs::write(&path, input.data).map_err(|error| format!("파일 저장에 실패했습니다. {error}"))?;
+    Ok(DriveDownloadOutput { path: path.to_string_lossy().to_string() })
+}
+
+#[tauri::command]
+fn write_client_log(app: AppHandle, input: ClientLogInput) -> Result<String, String> {
+    let dir = app.path().app_config_dir().map_err(|error| error.to_string())?;
+    fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
+    let path = dir.join("bighub-client.log");
+    let mut line = input.line.replace(['\r', '\n'], " ");
+    if line.len() > 4000 {
+        line.truncate(4000);
+    }
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|error| error.to_string())?;
+    writeln!(file, "{line}").map_err(|error| error.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![]),
@@ -247,9 +369,12 @@ pub fn run() {
             get_desktop_app_version,
             get_desktop_settings,
             set_desktop_setting,
+            choose_download_dir,
             notify_desktop,
             check_desktop_update,
-            install_desktop_update
+            install_desktop_update,
+            save_downloaded_file,
+            write_client_log
         ])
         .run(tauri::generate_context!())
         .expect("error while running BigHub");

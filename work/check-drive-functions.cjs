@@ -1,0 +1,31 @@
+const fs = require("fs");
+const path = require("path");
+const assert = require("assert");
+const root = path.resolve(__dirname, "..");
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const required = (source, value, label) => assert.ok(source.includes(value), label + " missing");
+const forbidden = (source, value, label) => assert.ok(!source.includes(value), label + " remains");
+const appSources = [read("app.js"), read("desktop-dist/app.js")];
+for (const source of appSources) {
+  required(source, "/functions/v1/", "Supabase Function route");
+  required(source, "drive-upload", "Drive upload function call");
+  required(source, "drive-download", "Drive download function call");
+  forbidden(source, "remoteApiOrigin", "retired Vercel route");
+  forbidden(source, "upload_drive_file", "retired service-account upload");
+  forbidden(source, "download_drive_file", "retired service-account download");
+  forbidden(source, "driveImagePreviewUrl", "direct Google image preview");
+  assert.strictEqual(source.split("function setUploadStatus(").length - 1, 1, "duplicate upload status helper");
+}
+const sharedPath = "supabase/functions/_shared/index.ts";
+const uploadPath = "supabase/functions/drive-upload/index.ts";
+const downloadPath = "supabase/functions/drive-download/index.ts";
+for (const file of [sharedPath, uploadPath, downloadPath]) assert.ok(fs.existsSync(path.join(root, file)), file + " missing");
+const shared = read(sharedPath);
+const upload = read(uploadPath);
+const download = read(downloadPath);
+for (const name of ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN", "GOOGLE_DRIVE_FOLDER_ID"]) required(shared + upload, name, name);
+required(upload, "file.size > 10 * 1024 * 1024", "10 MB upload cap");
+required(upload, "parents: [requiredGoogleFolderId()]", "owner folder target");
+required(upload, "requireApprovedUser(req)", "approved-user upload check");
+required(download, "requireApprovedUser(req)", "approved-user download check");
+console.log("central Drive route check: passed");

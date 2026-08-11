@@ -1,20 +1,14 @@
 const storeKey = "bighub-state-v5";
-const sessionKey = "bighub-session-v1";
-const rememberedLoginIdKey = "bighub-remembered-login-id";
-const autoLoginKey = "bighub-auto-login";
 const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
+const clientLogKey = "bighub-client-log-v1";
 const webAppVersion = "2026.08.05-desktop-local-1";
 const S = window.EducationState;
 
 let state = loadState();
-let currentUserId = localStorage.getItem(autoLoginKey) === "1" ? localStorage.getItem(sessionKey) || "" : sessionStorage.getItem(sessionKey) || "";
 let activeView = "feed";
 let postFilter = "all";
-let editingPostId = "";
-let uploadedAttachments = [];
-let removeExistingAttachment = false;
 let shouldRestoreFeedPosition = true;
 let feedPositionSaveTimer = 0;
 let remoteSyncInFlight = false;
@@ -38,7 +32,7 @@ function renderVersionStatus() {
   const status = byId("desktopVersionStatus");
   if (!status) return;
   const desktopText = isDesktopApp() ? `데스크톱 v${desktopAppVersion || "확인 중"}` : "웹 브라우저";
-  status.textContent = `${desktopText} / ? ${webAppVersion}`;
+  status.textContent = `${desktopText} · 웹 빌드 ${webAppVersion}`;
 }
 const notificationPollIntervalMs = 10000;
 let expandedPostIds = new Set();
@@ -54,13 +48,28 @@ function saveState() { if (!remoteAuth()) localStorage.setItem(storeKey, JSON.st
 function remoteAuth() { return window.BigHubSupabase && window.BigHubSupabase.isConfigured(); }
 function byId(id) { return document.getElementById(id); }
 function isDesktopApp() { return Boolean(window.__TAURI__?.core?.invoke); }
-const remoteApiOrigin = "https://bighub-tau.vercel.app";
-function apiUrl(path) {
-  const value = String(path || "");
-  if (/^https?:\/\//.test(value)) return value;
-  return isDesktopApp() ? remoteApiOrigin + value : value;
-}
 async function desktopInvoke(command, args = {}) { return window.__TAURI__.core.invoke(command, args); }
+function clientLog(event, detail = {}) {
+  const entry = {
+    time: new Date().toISOString(),
+    event,
+    activeView,
+    hasCurrentUserId: Boolean(currentUserId),
+    hasHydratedSession: Boolean(hydrateCurrentUserId()),
+    remoteConfigured: Boolean(remoteAuth()),
+    ...detail,
+  };
+  const line = JSON.stringify(entry);
+  try {
+    const items = JSON.parse(localStorage.getItem(clientLogKey) || "[]");
+    items.push(entry);
+    localStorage.setItem(clientLogKey, JSON.stringify(items.slice(-120)));
+  } catch {}
+  console.info("[BigHub]", line);
+  if (isDesktopApp()) desktopInvoke("write_client_log", { input: { line } }).catch(() => {});
+}
+window.addEventListener("error", (event) => clientLog("window-error", { message: event.message || "", source: event.filename || "", line: event.lineno || 0 }));
+window.addEventListener("unhandledrejection", (event) => clientLog("unhandled-rejection", { message: event.reason?.message || String(event.reason || "") }));
 function cachedDesktopSettings() {
   try { return JSON.parse(localStorage.getItem(desktopSettingsKey) || "null"); } catch { return null; }
 }
@@ -72,6 +81,7 @@ async function loadDesktopSettings() {
     notifyPosts: true,
     notifyComments: true,
     notifyMissions: true,
+    downloadDir: "",
   };
   if (!isDesktopApp()) return desktopSettings;
   try {
@@ -87,6 +97,12 @@ async function setDesktopSetting(key, value) {
   localStorage.setItem(desktopSettingsKey, JSON.stringify(desktopSettings));
   if (!isDesktopApp()) return desktopSettings;
   desktopSettings = await desktopInvoke("set_desktop_setting", { key, value });
+  localStorage.setItem(desktopSettingsKey, JSON.stringify(desktopSettings));
+  return desktopSettings;
+}
+async function chooseDesktopDownloadDir() {
+  if (!isDesktopApp()) return desktopSettings;
+  desktopSettings = await desktopInvoke("choose_download_dir");
   localStorage.setItem(desktopSettingsKey, JSON.stringify(desktopSettings));
   return desktopSettings;
 }
@@ -159,21 +175,28 @@ async function requestBrowserNotificationPermission() {
   try { return (await Notification.requestPermission()) === "granted"; } catch { return false; }
 }
 async function notifyDesktop(title, body) {
-  if (!desktopSettings?.notificationsEnabled) return { ok: false, error: "알림 받기가 꺼져 있습니다." };
+  if (!desktopSettings?.notificationsEnabled) {
+    clientLog("notification-skipped", { reason: "disabled" });
+    return { ok: false, error: "\uC54C\uB9BC \uBC1B\uAE30\uAC00 \uB044\uC838 \uC788\uC2B5\uB2C8\uB2E4." };
+  }
   if (isDesktopApp()) {
     try {
-      await withTimeout(desktopInvoke("notify_desktop", { title, body }), 2500, "Windows 알림 호출이 응답하지 않습니다.");
+      await withTimeout(desktopInvoke("notify_desktop", { title, body }), 2500, "Windows \uC54C\uB9BC \uD638\uCD9C\uC774 \uC751\uB2F5\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
+      clientLog("notification-sent", { channel: "desktop" });
       return { ok: true };
     } catch (error) {
       console.warn(error);
-      return { ok: false, error: error.message || "Windows 알림을 보낼 수 없습니다." };
+      clientLog("notification-failed", { channel: "desktop", message: error.message || String(error || "") });
+      return { ok: false, error: error.message || "Windows \uC54C\uB9BC\uC744 \uBCF4\uB0BC \uC218 \uC5C6\uC2B5\uB2C8\uB2E4." };
     }
   }
   if (await requestBrowserNotificationPermission()) {
     new Notification(title, { body, icon: "icons/icon.png" });
+    clientLog("notification-sent", { channel: "browser" });
     return { ok: true };
   }
-  return { ok: false, error: "브라우저 알림 권한이 꺼져 있습니다." };
+  clientLog("notification-failed", { channel: "browser", message: "permission denied" });
+  return { ok: false, error: "\uBE0C\uB77C\uC6B0\uC800 \uC54C\uB9BC \uAD8C\uD55C\uC774 \uB044\uC838 \uC788\uC2B5\uB2C8\uB2E4." };
 }
 function notifyForRemoteChanges(beforePostIds, beforeCommentIds) {
   if (!desktopSettings?.notificationsEnabled) return;
@@ -201,7 +224,8 @@ function notifyForRemoteChanges(beforePostIds, beforeCommentIds) {
 function escapeHtml(value) { return String(value || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;"); }
 function user(userId) { return state.users.find((item) => item.id === userId) || state.users[0]; }
 function userName(userId) { return user(userId).name; }
-function currentUser() { return state.users.find((item) => item.id === currentUserId) || null; }
+function fallbackRemoteUser() { hydrateCurrentUserId(); return remoteAuth() && currentUserId ? { id: currentUserId, name: "사용자", role: "member", department: "", avatar: "" } : null; }
+function currentUser() { return state.users.find((item) => item.id === currentUserId) || (currentUserSnapshot?.id === currentUserId ? currentUserSnapshot : null) || fallbackRemoteUser(); }
 function isImageAvatar(value) { return /^(data:image\/|https?:\/\/)/.test(String(value || "")); }
 function departmentAvatarClass(department) {
   const key = String(department || "");
@@ -223,8 +247,6 @@ function avatarMarkup(item, className = "avatar") {
 function avatarHtml(userId) { return avatarMarkup(user(userId), "avatar"); }
 function linkHtml(url, label) { return url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${label}</a>` : ""; }
 function emptyHtml() { return byId("emptyTemplate").innerHTML; }
-function setSession(userId, autoLogin) { const primary = autoLogin ? localStorage : sessionStorage; const secondary = autoLogin ? sessionStorage : localStorage; primary.setItem(sessionKey, userId); secondary.removeItem(sessionKey); if (autoLogin) localStorage.setItem(autoLoginKey, "1"); else localStorage.removeItem(autoLoginKey); }
-function clearSession() { localStorage.removeItem(sessionKey); sessionStorage.removeItem(sessionKey); localStorage.removeItem(autoLoginKey); }
 function postTypeLabel(type) { return { general: "일반", notice: "공지", mission: "미션", question: "질문" }[type] || "일반"; }
 function feedPositionStorageKey() { return `${feedPositionKey}:${currentUserId || "guest"}`; }
 function readFeedPosition() {
@@ -280,6 +302,7 @@ function restoreFeedPosition() {
 }
 
 async function init() {
+  clientLog("init-start");
   bindAuthForms();
   bindNavigation();
   bindForms();
@@ -290,31 +313,52 @@ async function init() {
   if (remoteAuth()) await restoreRemoteSession();
   applySavedFeedFilter();
   render();
+  clientLog("init-rendered");
 }
 
 async function restoreRemoteSession() {
-  if (localStorage.getItem(autoLoginKey) !== "1") { await window.BigHubSupabase.signOut(); return; }
+  hydrateCurrentUserId();
   try {
     const profile = await window.BigHubSupabase.currentProfile();
-    if (!profile) return;
+    if (!profile) {
+      hydrateCurrentUserId();
+      return;
+    }
     currentUserId = profile.id;
+    setSession(currentUserId, localStorage.getItem(autoLoginKey) === "1");
     mergeRemoteUser(profile);
     await tryRefreshRemoteData();
   } catch (error) {
+    hydrateCurrentUserId();
     console.warn(error);
   }
 }
-
 function mergeRemoteUser(user) {
+  if (!user) return;
+  if (user.id === currentUserId) {
+    currentUserSnapshot = user;
+    localStorage.setItem(currentUserSnapshotKey, JSON.stringify(user));
+  }
   state = { ...state, users: [user, ...state.users.filter((item) => item.id !== user.id)] };
 }
 
 async function refreshRemoteData() {
   if (!remoteAuth()) return;
-  const users = await window.BigHubSupabase.listProfiles();
-  state = { ...state, users };
+  const activeUser = currentUser();
   const content = await window.BigHubSupabase.listContent();
   state = { ...state, ...content };
+  try {
+    const users = await window.BigHubSupabase.listProfiles();
+    state = { ...state, users };
+    if (currentUserId && !currentUser()) {
+      const profile = await window.BigHubSupabase.currentProfile().catch(() => null);
+      if (profile) mergeRemoteUser(profile);
+      else if (activeUser) mergeRemoteUser(activeUser);
+    }
+  } catch (error) {
+    if (activeUser && currentUserId && !currentUser()) mergeRemoteUser(activeUser);
+    console.warn("Profile refresh skipped", error);
+  }
 }
 
 async function tryRefreshRemoteData() {
@@ -520,17 +564,20 @@ function bindNavigation() {
       event.currentTarget.value = "";
     }
   });
-  byId("resetDemo").addEventListener("click", () => { localStorage.removeItem(storeKey); clearSession(); state = loadState(); currentUserId = ""; render(); });
+  byId("resetDemo").addEventListener("click", async () => { const button = byId("resetDemo"); if (button) button.disabled = true; try { if (remoteAuth()) await refreshRemoteData(); else state = loadState(); render(); } catch (error) { alert(error.message || "새로고침에 실패했습니다."); } finally { if (button) button.disabled = false; } });
 }
 
 function bindDesktopSettings() {
   byId("desktopNotificationTestButton")?.addEventListener("click", async () => {
     const status = byId("desktopNotificationStatus");
     const button = byId("desktopNotificationTestButton");
-    if (status) status.textContent = "알림 테스트 중...";
     if (button) button.disabled = true;
+    for (let remaining = 3; remaining > 0; remaining -= 1) {
+      if (status) status.textContent = `${remaining}\uCD08 \uD6C4 \uC54C\uB9BC\uC744 \uBCF4\uB0C5\uB2C8\uB2E4. BigHub\uB97C \uD2B8\uB808\uC774\uB098 \uB4A4\uB85C \uBCF4\uB0B4\uACE0 \uD655\uC778\uD558\uC138\uC694.`;
+      await wait(1000);
+    }
     const result = await notifyDesktop("BigHub 알림 테스트", "이 알림이 보이면 Windows 알림 연결이 정상입니다.");
-    if (status) status.textContent = result.ok ? "알림을 보냈습니다. Windows 알림 센터를 확인하세요." : `알림 실패: ${result.error || "알림을 보낼 수 없습니다."}`;
+    if (status) status.textContent = result.ok ? "알림을 보냈습니다. Windows 알림 센터와 작업표시줄을 확인하세요." : `알림 실패: ${result.error || "알림을 보낼 수 없습니다."}`;
     if (button) button.disabled = false;
   });
   byId("desktopUpdateButton")?.addEventListener("click", async () => {
@@ -538,6 +585,21 @@ function bindDesktopSettings() {
     if (settingsStatus) settingsStatus.textContent = "";
     const info = await checkDesktopUpdate();
     if (info?.available) await installDesktopUpdate();
+  });
+  byId("desktopDownloadDirButton")?.addEventListener("click", async () => {
+    const status = byId("desktopSettingsStatus");
+    const button = byId("desktopDownloadDirButton");
+    if (status) status.textContent = "다운로드 폴더 선택 중...";
+    if (button) button.disabled = true;
+    try {
+      await chooseDesktopDownloadDir();
+      renderDesktopSettings();
+      if (status) status.textContent = "다운로드 폴더가 저장되었습니다.";
+    } catch (error) {
+      if (status) status.textContent = error.message || "다운로드 폴더 저장에 실패했습니다.";
+    } finally {
+      if (button) button.disabled = false;
+    }
   });
   document.querySelectorAll("[data-desktop-setting]").forEach((input) => {
     input.addEventListener("change", async () => {
@@ -569,50 +631,6 @@ window.BigHubDesktopOpenSettings = () => {
   activeView = "settings";
   render();
 };
-function openComposeModal() {
-  if (!currentUser()) return;
-  editingPostId = "";
-  const form = byId("postForm");
-  form.reset();
-  uploadedAttachments = [];
-  removeExistingAttachment = false;
-  byId("composeTitle").textContent = "새 게시물 만들기";
-  byId("driveUploadStatus").textContent = "";
-  updateMissionSettings();
-  byId("composeModal").classList.remove("hidden");
-  form.querySelector("input[name='title']").focus();
-}
-
-function openEditModal(postId) {
-  const post = state.posts.find((item) => item.id === postId);
-  if (!post || !canEditPost(post)) return;
-  editingPostId = post.id;
-  const form = byId("postForm");
-  form.reset();
-  form.elements.type.value = post.type || "general";
-  form.elements.title.value = post.title || "";
-  form.elements.body.value = post.body || "";
-  form.elements.startDate.value = post.startDate || "";
-  form.elements.dueDate.value = post.dueDate || "";
-  form.elements.mediaUrl.value = post.mediaUrl || "";
-  form.elements.attachmentUrl.value = isAttachmentBundle(post.attachmentUrl) ? "" : post.attachmentUrl || "";
-  removeExistingAttachment = false;
-  formDataCheckAll(form, "targetUserIds", post.targetUserIds || []);
-  formDataCheckAll(form, "completionRules", post.completionRules || []);
-  byId("composeTitle").textContent = "게시물 수정";
-  renderExistingAttachmentStatus(post);
-  updateMissionSettings();
-  byId("composeModal").classList.remove("hidden");
-  form.querySelector("input[name='title']").focus();
-}
-
-function formDataCheckAll(form, name, values) {
-  if (!values.length) return;
-  const selected = new Set(values);
-  Array.from(form.querySelectorAll(`input[name='${name}']`)).forEach((input) => { input.checked = selected.has(input.value); });
-}
-
-function closeComposeModal() { byId("composeModal").classList.add("hidden"); editingPostId = ""; uploadedAttachments = []; removeExistingAttachment = false; }
 function formatFileSize(bytes) {
   const size = Number(bytes) || 0;
   if (size < 1024) return `${size}B`;
@@ -620,179 +638,73 @@ function formatFileSize(bytes) {
   if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)}MB`;
   return `${(size / 1024 / 1024 / 1024).toFixed(1)}GB`;
 }
-function driveFileKey(file) {
-  return file ? `${file.name}:${file.size}:${file.lastModified}` : "";
+
+
+function muxCorsOrigin() {
+  const origin = String(location.origin || "").trim();
+  return /^https?:\/\//i.test(origin) ? origin : "http://tauri.localhost";
 }
 
-function selectedDriveFiles() {
-  return Array.from(byId("driveFileInput")?.files || []);
-}
-
-function uploadedFileKeys() {
-  return uploadedAttachments.map((item) => item.fileKey).filter(Boolean).join("|");
-}
-
-function selectedFileKeys(files) {
-  return files.map(driveFileKey).filter(Boolean).join("|");
-}
-
-function hasUploadedSelectedFiles(files) {
-  return files.length > 0 && uploadedAttachments.length === files.length && uploadedFileKeys() === selectedFileKeys(files);
-}
-
-function rememberUploadedAttachments(values) {
-  uploadedAttachments = values;
-  if (values.length) sessionStorage.setItem(uploadedAttachmentKey, JSON.stringify(values));
-}
-
-function loadUploadedAttachments(files) {
-  if (!files.length) return [];
-  if (hasUploadedSelectedFiles(files)) return uploadedAttachments;
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(uploadedAttachmentKey) || "[]");
-    if (Array.isArray(cached) && cached.length === files.length && cached.map((item) => item.fileKey).join("|") === selectedFileKeys(files)) {
-      uploadedAttachments = cached;
-      return cached;
-    }
-  } catch {}
-  return [];
-}
-
-function clearUploadedAttachments() {
-  uploadedAttachments = [];
-  sessionStorage.removeItem(uploadedAttachmentKey);
-}
-
-function renderExistingAttachmentStatus(post) {
-  const status = byId("driveUploadStatus");
-  if (!status) return;
-  const count = attachmentList(post).length;
-  if (!editingPostId || !count) { status.textContent = ""; return; }
-  if (removeExistingAttachment) { status.textContent = "현재 첨부 제거 예정"; return; }
-  status.innerHTML = `현재 첨부: ${count}개 <button class="clear-attachment-button" data-action="remove-existing-attachment" type="button">첨부 제거</button>`;
-}
-
-function updateDriveFileStatus() {
-  const files = selectedDriveFiles();
-  const status = byId("driveUploadStatus");
-  if (!status) return;
-  if (!files.length) {
-    clearUploadedAttachments();
-    const existingPost = editingPostId ? state.posts.find((post) => post.id === editingPostId) : null;
-    if (existingPost && !removeExistingAttachment) renderExistingAttachmentStatus(existingPost);
-    else status.textContent = "";
-    return;
-  }
-  loadUploadedAttachments(files);
-  if (!hasUploadedSelectedFiles(files)) uploadedAttachments = [];
-  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-  status.textContent = hasUploadedSelectedFiles(files)
-    ? `업로드 완료: ${files.length}개 파일`
-    : `선택됨: ${files.length}개 파일 (${formatFileSize(totalSize)})`;
-}
-async function authHeaders() {
-  if (!remoteAuth()) throw new Error("Supabase 로그인이 필요합니다.");
-  const token = await window.BigHubSupabase.accessToken();
-  if (!token) throw new Error("로그인 세션이 만료됐습니다. 다시 로그인하세요.");
-  return { Authorization: `Bearer ${token}` };
-}
-
-function setUploadStatus(message, progress = 0) {
-  const status = byId("driveUploadStatus");
-  if (!status) return;
-  const safeProgress = Math.max(0, Math.min(100, Math.round(progress)));
-  status.innerHTML = message
-    ? `<span>${escapeHtml(message)}</span><i style="--progress:${safeProgress}%"></i>`
-    : "";
-}
-
-async function uploadDriveFile(file) {
-  const headers = await authHeaders();
-  const sessionResponse = await fetch(apiUrl("/api/drive/create-upload"), {
+async function checkMuxUploadStatus(uploadId) {
+  const response = await fetch(driveFunctionUrl("mux-upload-status"), {
     method: "POST",
-    headers: { ...headers, "content-type": "application/json" },
-    body: JSON.stringify({ name: file.name, mimeType: file.type || "application/octet-stream", size: file.size }),
+    headers: { ...(await driveHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify({ uploadId }),
   });
-  const session = await sessionResponse.json().catch(() => ({}));
-  if (!sessionResponse.ok) throw new Error(session.error || "Drive 업로드 준비에 실패했습니다.");
-  if (session.file?.id) {
-    setUploadStatus("이미 Drive에 있는 파일 연결 중...", 100);
-    return {
-      id: session.file.id,
-      name: session.file.name || file.name,
-      mimeType: session.file.mimeType || file.type || "application/octet-stream",
-      downloadUrl: apiUrl(`/api/drive/download?id=${encodeURIComponent(session.file.id)}&name=${encodeURIComponent(session.file.name || file.name)}`),
-    };
-  }
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || "Mux status request failed.");
+  return result;
+}
 
-  const chunkSize = 3 * 1024 * 1024;
-  let uploaded;
-  for (let start = 0; start < file.size; start += chunkSize) {
-    const end = Math.min(start + chunkSize, file.size) - 1;
-    const chunk = file.slice(start, end + 1);
-    setUploadStatus(`Drive에 업로드 중... ${Math.round(((end + 1) / file.size) * 100)}%`, ((end + 1) / file.size) * 100);
-    const uploadResponse = await fetch(apiUrl("/api/drive/upload-chunk"), {
-      method: "POST",
-      headers: {
-        ...headers,
-        "content-type": file.type || "application/octet-stream",
-        "x-upload-url": session.uploadUrl,
-        "x-upload-start": String(start),
-        "x-upload-end": String(end),
-        "x-upload-size": String(file.size),
-      },
-      body: chunk,
-    });
-    const result = await uploadResponse.json().catch(() => ({}));
-    if (!uploadResponse.ok) throw new Error(result.error || "Drive 업로드에 실패했습니다.");
-    if (result.done) uploaded = result.file;
-  }
+function wait(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
-  if (!uploaded?.id) throw new Error("Drive 업로드가 완료되지 않았습니다.");
+async function pollMuxUploadStatus(uploadId) {
+  for (let attempt = 0; attempt < 18; attempt += 1) {
+    const status = await checkMuxUploadStatus(uploadId);
+    if (status.playbackId && status.state === "ready") return status;
+    setUploadStatus("Mux video processing...", Math.min(95, 70 + attempt));
+    await wait(5000);
+  }
+  return { state: "processing" };
+}
+
+async function uploadMuxVideoFile(file) {
+  if (!remoteAuth()) throw new Error("Supabase login is required.");
+  setUploadStatus("Preparing Mux upload...", 10);
+  const createResponse = await fetch(driveFunctionUrl("mux-create-upload"), {
+    method: "POST",
+    headers: { ...(await driveHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name, mimeType: file.type || "video/mp4", corsOrigin: muxCorsOrigin() }),
+  });
+  const result = await createResponse.json().catch(() => ({}));
+  if (!createResponse.ok) throw new Error(result.error || "Mux upload setup failed.");
+  if (!result.uploadId || !result.uploadUrl) throw new Error("Mux upload URL was not returned.");
+
+  setUploadStatus("Uploading video to Mux...", 35);
+  const uploadResponse = await fetch(result.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  if (!uploadResponse.ok) throw new Error("Mux video upload failed.");
+
+  const status = await pollMuxUploadStatus(result.uploadId);
+  setUploadStatus(status.playbackId ? "Mux video ready" : "Mux video processing", status.playbackId ? 100 : 95);
   return {
-    id: uploaded.id,
-    name: uploaded.name || file.name,
-    mimeType: uploaded.mimeType || file.type || "application/octet-stream",
-    downloadUrl: apiUrl(`/api/drive/download?id=${encodeURIComponent(uploaded.id)}&name=${encodeURIComponent(uploaded.name || file.name)}`),
+    url: `mux:${result.uploadId}`,
+    provider: "mux",
+    uploadId: result.uploadId,
+    assetId: status.assetId || "",
+    playbackId: status.playbackId || "",
+    state: status.state || "processing",
+    name: file.name,
+    mimeType: file.type || "video/mp4",
   };
 }
 
-async function downloadDriveFile(url, postId) {
-  const response = await fetch(apiUrl(url), { headers: await authHeaders() });
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.error || "파일 다운로드에 실패했습니다.");
-  }
-  const blob = await response.blob();
-  const disposition = response.headers.get("content-disposition") || "";
-  const match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
-  const fallback = new URL(url, location.href).searchParams.get("name") || "download";
-  const filename = match ? decodeURIComponent(match[1]) : fallback;
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = objectUrl;
-  anchor.download = filename;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(objectUrl);
-  if (remoteAuth()) {
-    await window.BigHubSupabase.recordFileDownload({ postId, userId: currentUserId });
-    await refreshRemoteData();
-  } else {
-    state = S.recordFileDownload(state, { postId, userId: currentUserId });
-    saveState();
-  }
-}
 
-function isDriveDownloadUrl(url) {
-  const value = String(url || "");
-  return value.startsWith("/api/drive/download") || value.startsWith(`${remoteApiOrigin}/api/drive/download`);
-}
-
-function driveFileName(url) {
-  try { return new URL(url, location.href).searchParams.get("name") || "Drive 파일"; } catch { return "Drive 파일"; }
-}
 
 function isAttachmentBundle(value) {
   const raw = String(value || "").trim();
@@ -803,6 +715,11 @@ function normalizeAttachment(item) {
   const url = String(item?.url || item?.downloadUrl || "").trim();
   return {
     url,
+    provider: String(item?.provider || "").trim(),
+    uploadId: String(item?.uploadId || "").trim(),
+    assetId: String(item?.assetId || "").trim(),
+    playbackId: String(item?.playbackId || "").trim(),
+    state: String(item?.state || "").trim(),
     name: String(item?.name || driveFileName(url)).trim(),
     mimeType: String(item?.mimeType || item?.attachmentMimeType || "").trim(),
   };
@@ -820,21 +737,25 @@ function attachmentList(post) {
   return [normalizeAttachment({ url: raw, name: post.attachmentName || driveFileName(raw), mimeType: post.attachmentMimeType || "" })];
 }
 
+function isMuxAttachment(item) {
+  return item?.provider === "mux" || String(item?.url || "").startsWith("mux:");
+}
+
 function attachmentPayload(attachments) {
   const list = attachments.map(normalizeAttachment).filter((item) => item.url);
   if (!list.length) return { attachmentUrl: "", attachmentName: "", attachmentMimeType: "" };
-  if (list.length === 1) return { attachmentUrl: list[0].url, attachmentName: list[0].name, attachmentMimeType: list[0].mimeType };
-  return { attachmentUrl: JSON.stringify(list), attachmentName: `${list.length}개 파일`, attachmentMimeType: "application/vnd.bighub.attachments+json" };
+  if (list.length === 1 && !isMuxAttachment(list[0])) return { attachmentUrl: list[0].url, attachmentName: list[0].name, attachmentMimeType: list[0].mimeType };
+  return { attachmentUrl: JSON.stringify(list), attachmentName: list.length === 1 ? list[0].name : `${list.length} files`, attachmentMimeType: "application/vnd.bighub.attachments+json" };
 }
 
 function isVideoFile(item) {
-  const mime = String(item?.mimeType || "").toLowerCase();
+  const mime = String(item?.mimeType || item?.type || "").toLowerCase();
   const name = String(item?.name || driveFileName(item?.url)).toLowerCase();
   return mime.startsWith("video/") || /\.(mp4|mov|m4v|webm)(\?.*)?$/.test(name);
 }
 
 function isImageFile(item) {
-  const mime = String(item?.mimeType || "").toLowerCase();
+  const mime = String(item?.mimeType || item?.type || "").toLowerCase();
   const name = String(item?.name || driveFileName(item?.url)).toLowerCase();
   return mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/.test(name);
 }
@@ -870,120 +791,17 @@ function attachmentRowHtml(postId, item) {
 function saveControlHtml(post) {
   const attachments = attachmentList(post);
   if (!attachments.length) return "";
-  const item = representativeAttachment(post) || attachments[0];
+  const representative = representativeAttachment(post);
+  const hasInlineAttachments = attachments.some((item) => item.url !== representative?.url);
+  if (hasInlineAttachments) return "";
+  const item = representative || attachments[0];
   const safeUrl = escapeHtml(item.url);
   if (isDriveDownloadUrl(item.url)) {
     return `<button class="save-link" data-action="download-file" data-post-id="${post.id}" data-url="${safeUrl}" type="button" title="다운로드" aria-label="다운로드">${iconSvg("download")}</button>`;
   }
   return `<a class="save-link" href="${safeUrl}" target="_blank" rel="noreferrer" title="열기" data-action="download-file" data-post-id="${post.id}" data-url="${safeUrl}">${iconSvg("download")}</a>`;
 }
-function setDriveFiles(files) {
-  const input = byId("driveFileInput");
-  if (!input || !files?.length) return;
-  const transfer = new DataTransfer();
-  files.forEach((file) => transfer.items.add(file));
-  input.files = transfer.files;
-  updateDriveFileStatus();
-}
 
-function bindDriveDropZone() {
-  const dropZone = document.querySelector(".upload-drop");
-  if (!dropZone || dropZone.dataset.dropBound === "1") return;
-  dropZone.dataset.dropBound = "1";
-  ["dragenter", "dragover"].forEach((eventName) => {
-    dropZone.addEventListener(eventName, (event) => {
-      event.preventDefault();
-      dropZone.classList.add("drag-over");
-    });
-  });
-  ["dragleave", "drop"].forEach((eventName) => {
-    dropZone.addEventListener(eventName, (event) => {
-      event.preventDefault();
-      if (eventName === "drop") setDriveFiles(Array.from(event.dataTransfer?.files || []));
-      if (!dropZone.contains(event.relatedTarget)) dropZone.classList.remove("drag-over");
-    });
-  });
-}
-
-function updateMissionSettings() {
-  const type = byId("postTypeSelect")?.value;
-  const settings = byId("missionSettings");
-  if (settings) settings.classList.toggle("hidden", type !== "mission");
-}
-
-function bindForms() {
-  renderMissionTargets();
-  updateMissionSettings();
-  byId("postTypeSelect")?.addEventListener("change", updateMissionSettings);
-  bindDriveDropZone();
-  byId("driveFileInput")?.addEventListener("change", updateDriveFileStatus);
-  byId("postForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData);
-    const files = selectedDriveFiles();
-    const status = byId("driveUploadStatus");
-    const submitButton = form.querySelector("button[type='submit']");
-    try {
-      const manualAttachmentUrl = String(data.attachmentUrl || "").trim();
-      const uploadedFileAttachments = [];
-      if (files.length) {
-        if (submitButton) submitButton.disabled = true;
-        if (!hasUploadedSelectedFiles(files)) {
-          const uploaded = [];
-          for (let index = 0; index < files.length; index += 1) {
-            const file = files[index];
-            setUploadStatus(`Drive 업로드 중... ${index + 1}/${files.length}`, Math.round((index / files.length) * 100));
-            const result = await uploadDriveFile(file);
-            uploaded.push({ ...result, fileKey: driveFileKey(file) });
-          }
-          rememberUploadedAttachments(uploaded);
-          setUploadStatus("업로드 완료", 100);
-        } else {
-          setUploadStatus("이미 업로드된 파일 연결 중...", 100);
-        }
-        uploadedFileAttachments.push(...uploadedAttachments.map((item) => ({ url: item.downloadUrl, name: item.name, mimeType: item.mimeType })));
-      }
-      const manualAttachments = manualAttachmentUrl ? [{ url: manualAttachmentUrl, name: driveFileName(manualAttachmentUrl), mimeType: "" }] : [];
-      const existingPost = editingPostId ? state.posts.find((post) => post.id === editingPostId) : null;
-      const existingIsBundle = existingPost && isAttachmentBundle(existingPost.attachmentUrl);
-      const existingSingleUrl = existingPost && !existingIsBundle ? String(existingPost.attachmentUrl || "").trim() : "";
-      const singleAttachmentCleared = Boolean(editingPostId && existingSingleUrl && !manualAttachmentUrl && !files.length);
-      const nextAttachments = [...uploadedFileAttachments, ...manualAttachments];
-      if (nextAttachments.length) Object.assign(data, attachmentPayload(nextAttachments));
-      else if (removeExistingAttachment || singleAttachmentCleared) Object.assign(data, attachmentPayload([]));
-      else if (existingPost && existingIsBundle) Object.assign(data, attachmentPayload(attachmentList(existingPost)));
-      else Object.assign(data, attachmentPayload([]));
-      delete data.driveFile;
-      data.targetUserIds = data.type === "mission" ? formData.getAll("targetUserIds") : [];
-      data.completionRules = formData.getAll("completionRules");
-      if (remoteAuth()) {
-        const payload = { ...data, authorId: currentUserId };
-        if (editingPostId) await window.BigHubSupabase.updatePost(editingPostId, payload);
-        else await window.BigHubSupabase.createPost(payload);
-        await refreshRemoteData();
-      } else {
-        state = editingPostId ? S.updatePost(state, editingPostId, data, currentUserId) : S.addPost(state, { ...data, authorId: currentUserId });
-        saveState();
-      }
-      form.reset();
-      clearUploadedAttachments();
-      removeExistingAttachment = false;
-      setUploadStatus("");
-      closeComposeModal();
-      activeView = "feed";
-      shouldRestoreFeedPosition = false;
-      render();
-      window.scrollTo(0, 0);
-    } catch (error) {
-      setUploadStatus(error.message || "파일 업로드에 실패했습니다.");
-      alert(error.message || "파일 업로드에 실패했습니다.");
-    } finally {
-      if (submitButton) submitButton.disabled = false;
-    }
-  });
-}
 
 function renderDesktopSettings() {
   const button = byId("desktopSettingsButton");
@@ -993,10 +811,13 @@ function renderDesktopSettings() {
   document.querySelectorAll("[data-desktop-setting]").forEach((input) => {
     input.checked = Boolean(desktopSettings[input.dataset.desktopSetting]);
   });
+  const downloadDirPath = byId("desktopDownloadDirPath");
+  if (downloadDirPath) downloadDirPath.textContent = desktopSettings.downloadDir || "기본 다운로드 폴더 사용";
 }
 
 function render() {
-  const signedIn = Boolean(currentUser());
+  const sessionUserId = hydrateCurrentUserId();
+  const signedIn = Boolean(sessionUserId || currentUser());
   byId("authView").classList.toggle("hidden", signedIn);
   byId("appShell").classList.toggle("hidden", !signedIn);
   if (!signedIn) return;
@@ -1030,15 +851,34 @@ function renderCurrentUser() {
   byId("currentRole").textContent = item.role === "admin" ? "admin" : `${item.department} \u00B7 ${item.role}`;
 }
 
-function canManagePost(post) { const item = currentUser(); return Boolean(item && (item.role === "admin" || post.authorId === item.id)); }
+function canCreateNoticePost() { return currentUser()?.role === "admin"; }
+function canManagePost(post) { const item = currentUser(); if (!item) return false; if (post.type === "notice") return item.role === "admin"; return item.role === "admin" || post.authorId === item.id; }
 function canEditPost(post) { return canManagePost(post); }
 function hasCompletionCheck(post) { return Array.isArray(post.completionRules) && post.completionRules.includes("done"); }
 
 function renderFeed() {
+  const target = byId("postList");
   document.querySelectorAll(".filter-chip").forEach((button) => button.classList.toggle("active", button.dataset.filter === postFilter));
-  const posts = sortFeedPosts(state.posts.filter((post) => postFilter === "all" || post.type === postFilter));
-  byId("postList").innerHTML = posts.length ? posts.map(postCardHtml).join("") : emptyHtml();
+  try {
+    const posts = sortFeedPosts(state.posts.filter((post) => postFilter === "all" || post.type === postFilter));
+    if (!posts.length) {
+      target.innerHTML = emptyHtml();
+      return;
+    }
+    target.innerHTML = posts.map((post) => {
+      try { return postCardHtml(post); }
+      catch (error) {
+        console.warn("Post render failed", post, error);
+        return `<article class="feed-card text-card"><section class="feed-body"><h3>${escapeHtml(post.title || "게시글 표시 오류")}</h3><p class="post-text">게시글을 표시하는 중 문제가 발생했습니다.</p></section></article>`;
+      }
+    }).join("");
+  } catch (error) {
+    console.warn("Feed render failed", error);
+    target.innerHTML = emptyHtml();
+    return;
+  }
   hydrateDriveVideos();
+  hydrateMuxVideos();
 }
 
 function sortFeedPosts(posts) {
@@ -1110,44 +950,104 @@ function mediaPreviewHtml(url, post) {
   return `<a class="media-preview" href="${escapeHtml(url)}" target="_blank" rel="noreferrer"><div class="file-preview"><div class="file-icon">${label}</div><strong>${escapeHtml(post.title)}</strong><span>열어서 보기</span></div></a>`;
 }
 
-async function hydrateDriveVideos() {
-  const media = Array.from(document.querySelectorAll("[data-drive-src]:not([src])"));
-  if (!media.length || !remoteAuth()) return;
-  const token = await window.BigHubSupabase.accessToken().catch(() => "");
-  if (!token) return;
-  media.forEach((item) => {
-    const separator = item.dataset.driveSrc.includes("?") ? "&" : "?";
-    item.src = `${item.dataset.driveSrc}${separator}token=${encodeURIComponent(token)}`;
-    if (item.tagName === "VIDEO") {
-      item.preload = "auto";
-      item.load();
-    }
-  });
-}
-function commentsHtml(postId, comments) {
-  const roots = comments.filter((comment) => !comment.parentId);
-  return roots.map((comment) => commentHtml(comment, comments.filter((reply) => reply.parentId === comment.id))).join("");
-}
-function commentHtml(comment, replies = []) {
-  const canDelete = currentUser()?.role === "admin" || comment.userId === currentUserId;
-  return `<div class="comment" id="comment-${comment.id}">${commentAvatarHtml(comment.userId)}<div class="comment-content"><p><strong>${escapeHtml(userName(comment.userId))}</strong>${escapeHtml(comment.body)}</p><div class="comment-tools"><button data-focus-reply="${comment.id}" type="button">답글</button>${canDelete ? `<button data-action="delete-comment" data-comment-id="${comment.id}" type="button">삭제</button>` : ""}</div>${replies.length ? `<div class="reply-list">${replies.map((reply) => replyHtml(reply)).join("")}</div>` : ""}<form class="inline-form reply-form hidden" data-action="comment" data-post-id="${comment.postId}" data-parent-id="${comment.id}"><input name="body" placeholder="답글을 입력하세요." required /><button type="submit">게시</button></form></div></div>`;
-}
-function replyHtml(comment) {
-  const canDelete = currentUser()?.role === "admin" || comment.userId === currentUserId;
-  return `<div class="comment reply" id="comment-${comment.id}">${commentAvatarHtml(comment.userId)}<div class="comment-content"><p><strong>${escapeHtml(userName(comment.userId))}</strong>${escapeHtml(comment.body)}</p>${canDelete ? `<div class="comment-tools"><button data-action="delete-comment" data-comment-id="${comment.id}" type="button">삭제</button></div>` : ""}</div></div>`;
-}
-function commentAvatarHtml(userId) {
-  return avatarMarkup(user(userId), "comment-avatar");
-}
-function dateText(post) { if (post.startDate && post.dueDate) return ` · ${post.startDate} ~ ${post.dueDate}`; if (post.dueDate) return ` · ${post.dueDate} 마감`; if (post.startDate) return ` · ${post.startDate} 시작`; return ""; }
 
-function renderSearch() { const input = byId("globalSearch"); if (!input) return; const query = input.value.trim().toLowerCase(); if (!query) { byId("searchResults").innerHTML = `<div class="empty">검색어를 입력하세요.</div>`; return; } const results = state.posts.filter((post) => `${post.title} ${post.body} ${postTypeLabel(post.type)}`.toLowerCase().includes(query)).map((post) => resultCard(postTypeLabel(post.type), post.title, post.body)); byId("searchResults").innerHTML = results.length ? results.join("") : emptyHtml(); }
+
+async function muxPlaybackUrl(playbackId) {
+  if (muxPlaybackUrls.has(playbackId)) return muxPlaybackUrls.get(playbackId);
+  if (muxPlaybackLoads.has(playbackId)) return muxPlaybackLoads.get(playbackId);
+  const load = fetch(driveFunctionUrl("mux-playback-token"), {
+    method: "POST",
+    headers: { ...(await driveHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify({ playbackId }),
+  })
+    .then(async (response) => {
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Mux playback token request failed.");
+      if (!result.token) throw new Error("Mux playback token was not returned.");
+      const url = `https://stream.mux.com/${encodeURIComponent(playbackId)}.m3u8?token=${encodeURIComponent(result.token)}`;
+      muxPlaybackUrls.set(playbackId, url);
+      return url;
+    })
+    .finally(() => muxPlaybackLoads.delete(playbackId));
+  muxPlaybackLoads.set(playbackId, load);
+  return load;
+}
+
+function attachMuxVideoSource(video, url) {
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = url;
+    return;
+  }
+  if (window.Hls?.isSupported()) {
+    if (video._bighubHls) video._bighubHls.destroy();
+    const hls = new window.Hls();
+    video._bighubHls = hls;
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    return;
+  }
+  video.src = url;
+}
+async function hydrateMuxVideos() {
+  const videos = Array.from(document.querySelectorAll("[data-mux-playback-id]:not([src])"));
+  await Promise.allSettled(videos.map(async (item) => {
+    try {
+      attachMuxVideoSource(item, await muxPlaybackUrl(item.dataset.muxPlaybackId));
+    } catch (error) {
+      item.closest(".video-preview")?.classList.add("preview-error");
+      console.warn("Mux video preview failed", error);
+    }
+  }));
+  refreshMuxProcessingAttachments();
+}
+
+async function refreshMuxProcessingAttachments() {
+  const items = Array.from(document.querySelectorAll("[data-mux-upload-id][data-post-id]"));
+  await Promise.allSettled(items.map(async (item) => {
+    const uploadId = item.dataset.muxUploadId;
+    const postId = item.dataset.postId;
+    if (!uploadId || !postId || muxProcessingChecks.has(uploadId)) return;
+    muxProcessingChecks.add(uploadId);
+    try {
+      const status = await checkMuxUploadStatus(uploadId);
+      if (!status.playbackId || status.state !== "ready") return;
+      const post = state.posts.find((entry) => entry.id === postId);
+      if (!post) return;
+      const nextAttachments = attachmentList(post).map((attachment) => attachment.uploadId === uploadId ? { ...attachment, assetId: status.assetId || attachment.assetId, playbackId: status.playbackId, state: "ready" } : attachment);
+      const payload = attachmentPayload(nextAttachments);
+      if (remoteAuth()) await window.BigHubSupabase.updatePost(postId, { ...post, ...payload });
+      else state = S.updatePost(state, postId, payload, currentUserId);
+      if (remoteAuth()) await refreshRemoteData();
+      render();
+    } catch (error) {
+      console.warn("Mux processing status failed", error);
+    } finally {
+      window.setTimeout(() => muxProcessingChecks.delete(uploadId), 15000);
+    }
+  }));
+}
+
+function renderSearch() {
+  const input = byId("globalSearch");
+  const target = byId("searchResults");
+  if (!input || !target) return;
+  const query = input.value.trim().toLowerCase();
+  if (!query) {
+    target.innerHTML = `<div class="empty">검색어를 입력하세요.</div>`;
+    return;
+  }
+  const results = state.posts
+    .filter((post) => `${post.title} ${post.body} ${postTypeLabel(post.type)}`.toLowerCase().includes(query))
+    .map((post) => resultCard(postTypeLabel(post.type), post.title, post.body));
+  target.innerHTML = results.length ? results.join("") : emptyHtml();
+}
 function resultCard(type, title, body) { return `<article class="resource-card result-card"><span class="status-pill">${escapeHtml(type)}</span><h3>${escapeHtml(title)}</h3><p>${escapeHtml(body)}</p></article>`; }
 function renderProgress() { const members = state.users.filter((item) => item.role === "member"); const posts = state.posts.filter(hasCompletionCheck); byId("userProgress").innerHTML = members.map((item) => { const done = posts.filter((post) => S.getPostCompletion(state, post.id).completedUserIds.includes(item.id)).length; const percent = posts.length ? Math.round((done / posts.length) * 100) : 0; return progressCard(item.name, `${done}/${posts.length}개 완료`, percent); }).join("") || emptyHtml(); byId("postProgress").innerHTML = posts.map((post) => { const completion = S.getPostCompletion(state, post.id); return progressCard(post.title, `${completion.completedCount}/${completion.totalMembers}명 완료`, completion.percent); }).join("") || emptyHtml(); }
 function progressCard(title, meta, percent) { return `<article class="progress-card"><h3>${escapeHtml(title)}</h3><span class="feed-meta">${escapeHtml(meta)} · ${percent}%</span><div class="bar" aria-hidden="true"><span style="width: ${percent}%"></span></div></article>`; }
 function renderStats() { const questionCount = state.posts.filter((post) => post.type === "question").length; byId("quickStats").innerHTML = `<div class="stat-row"><span>게시물</span><strong>${state.posts.length}</strong></div><div class="stat-row"><span>질문</span><strong>${questionCount}</strong></div>`; }
 function renderApprovals() { const panel = byId("approvalPanel"); const pending = remoteAuth() ? state.users.filter((user) => user.status === "pending") : (state.signupRequests || []).filter((request) => request.status === "pending"); const admin = currentUser()?.role === "admin"; const compactHtml = pending.length ? pending.map((request) => `<div class="mini-item"><div><strong>${escapeHtml(request.name)}</strong><span>${escapeHtml(request.department)} · ${escapeHtml(request.loginId || "")}</span></div><button class="mini-button" data-action="approve-signup" data-request-id="${request.id}" type="button">승인</button></div>`).join("") : `<div class="mini-empty">대기 중인 신청 없음</div>`; const fullHtml = pending.length ? pending.map((request) => `<article class="feed-card text-card approval-card"><header class="feed-head"><div class="author-line"><div class="avatar">${escapeHtml((request.name || "?").slice(0, 1))}</div><div><strong>${escapeHtml(request.name)}</strong><span>${escapeHtml(request.department)} · ${escapeHtml(request.loginId || "")}</span></div></div><button class="mini-button" data-action="approve-signup" data-request-id="${request.id}" type="button">승인</button></header></article>`).join("") : emptyHtml(); panel.classList.toggle("hidden", !admin); byId("pendingCount").textContent = pending.length; byId("pendingList").innerHTML = compactHtml; byId("approvalViewCount").textContent = pending.length; byId("approvalViewList").innerHTML = fullHtml; }
 function renderCalendar() { const posts = state.posts.filter((post) => post.startDate || post.dueDate).sort((a, b) => String(a.dueDate || a.startDate).localeCompare(String(b.dueDate || b.startDate))); byId("calendarList").innerHTML = posts.length ? posts.map((post) => `<div class="mini-item calendar-item"><div><strong>${escapeHtml(post.title)}</strong><span>${postTypeLabel(post.type)} · ${escapeHtml(dateText(post).replace(/^ · /, ""))}</span></div></div>`).join("") : `<div class="mini-empty">등록된 일정 없음</div>`; }
+function dateText(post) { if (post.startDate && post.dueDate) return ` · ${post.startDate} ~ ${post.dueDate}`; if (post.dueDate) return ` · ${post.dueDate} 마감`; if (post.startDate) return ` · ${post.startDate} 시작`; return ""; }
 function formatDate(value) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "방금" : `${date.getMonth() + 1}.${date.getDate()}`; }
 
 document.addEventListener("click", async (event) => {
@@ -1165,6 +1065,7 @@ document.addEventListener("click", async (event) => {
   }
   if (target.dataset.action === "remove-existing-attachment") {
     removeExistingAttachment = true;
+    selectedDriveFileList = [];
     const input = byId("driveFileInput");
     if (input) input.value = "";
     const form = byId("postForm");
@@ -1218,8 +1119,12 @@ document.addEventListener("click", async (event) => {
   if (target.dataset.action === "download-file") {
     const url = target.dataset.url || target.href;
     if (!isDriveDownloadUrl(url)) {
-      if (remoteAuth()) await window.BigHubSupabase.recordFileDownload({ postId: target.dataset.postId, userId: currentUserId });
-      else { state = S.recordFileDownload(state, { postId: target.dataset.postId, userId: currentUserId }); saveState(); }
+      try {
+        if (remoteAuth()) await window.BigHubSupabase.recordFileDownload({ postId: target.dataset.postId, userId: currentUserId });
+        else { state = S.recordFileDownload(state, { postId: target.dataset.postId, userId: currentUserId }); saveState(); }
+      } catch (error) {
+        console.warn("Download record skipped", error);
+      }
       return;
     }
     event.preventDefault();

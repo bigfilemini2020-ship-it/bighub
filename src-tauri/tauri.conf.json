@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "BigHub",
-  "version": "0.1.7",
+  "version": "0.1.12",
   "identifier": "com.bigfile.bighub",
   "build": {
     "frontendDist": "../desktop-dist",
@@ -19,7 +19,8 @@
         "minWidth": 1024,
         "minHeight": 720,
         "resizable": true,
-        "center": true
+        "center": true,
+        "dragDropEnabled": false
       }
     ],
     "security": {
@@ -42,9 +43,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhGNDU2MjQ2QTNFRTY0NzEKUldSeFpPNmpSbUpGanlqYlhlOWtUeDAxMFdTTGlWRTVhSGxkazk0YUNlZnByQmdKT255RjF1cmIK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDMTMzNzE0NUMzNUM2N0IKUldSN3hqVmNGRGNUZlArYjVoNENjL1FlRHQ2MXlodHRib0VQWU1XY28vYVV6ZVVGWGFENHJWRXoK",
       "endpoints": [
-        "https://bighub-tau.vercel.app/api/update"
+        "https://github.com/bigfilemini2020-ship-it/bighub/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

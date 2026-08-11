@@ -1,9 +1,13 @@
 {
   "scripts": {
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build"
+    "desktop:build": "tauri build",
+    "updater:manifest": "node work/create-updater-manifest.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.7.1"
+  },
+  "dependencies": {
+    "hls.js": "^1.6.17"
   }
 }

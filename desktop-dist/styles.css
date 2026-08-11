@@ -2017,6 +2017,17 @@ textarea {
   flex: 0 0 auto;
 }
 
+
+.download-folder-row .mini-button {
+  flex: 0 0 auto;
+}
+
+#desktopDownloadDirPath {
+  max-width: 420px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* Collapsed posts and comment drawer */
 .image-preview {
   aspect-ratio: auto;
@@ -2030,6 +2041,39 @@ textarea {
   max-height: 720px;
   object-fit: contain;
   background: #fff;
+}
+
+.drive-image-preview {
+  position: relative;
+  min-height: 0;
+}
+
+.drive-image-preview .image-open-fallback {
+  display: none;
+}
+
+.drive-image-preview.load-failed {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  color: #1d4ed8;
+  background: #f8fafc;
+}
+
+.drive-image-preview.load-failed img {
+  display: none;
+}
+
+.drive-image-preview.load-failed .image-open-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 13px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .collapsed-card .feed-head {
@@ -2122,6 +2166,62 @@ textarea {
   margin-left: auto;
   width: 42px;
   color: var(--text);
+}
+
+
+.feed-actions .download-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.feed-actions .download-menu .save-link {
+  margin-left: 0;
+}
+
+.download-menu-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  min-width: 220px;
+  max-width: min(300px, 80vw);
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+  display: grid;
+  gap: 2px;
+}
+
+.download-menu-popover.hidden {
+  display: none;
+}
+
+.download-menu-popover button,
+.download-menu-popover a {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  display: block;
+  font: inherit;
+  padding: 10px 12px;
+  text-align: left;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-menu-popover button:hover,
+.download-menu-popover a:hover {
+  background: var(--soft);
 }
 
 .feed-actions .save-link:empty {
@@ -2242,4 +2342,119 @@ textarea {
   margin-left: auto;
   padding: 0;
   width: 42px;
+}
+
+
+.selected-file-list {
+  grid-column: 1 / -1;
+  width: 100%;
+  display: grid;
+  gap: 7px;
+  text-align: left;
+}
+
+.selected-file-list strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.selected-file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.selected-file-row span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.selected-file-row small,
+.selected-file-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.selected-file-remove {
+  border: 0;
+  background: transparent;
+  color: #dc2626;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.selected-file-remove:hover {
+  text-decoration: underline;
+}
+.download-toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1200;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 14px;
+  width: min(340px, calc(100vw - 32px));
+  padding: 14px 16px 16px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.18);
+}
+
+.download-toast.hidden {
+  display: none;
+}
+
+.download-toast strong {
+  min-width: 0;
+  font-size: 14px;
+}
+
+.download-toast span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.download-toast i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.download-toast i::before {
+  display: block;
+  width: var(--progress, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+  content: "";
+}
+
+.download-toast.success i::before {
+  background: #16a34a;
+}
+
+.download-toast.error i::before {
+  background: #dc2626;
+}
+.notification-test-button {
+  min-width: 108px;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BigHub</title>
     <link rel="icon" type="image/svg+xml" href="assets/bighub-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=notifications-1" />
+    <link rel="stylesheet" href="styles.css?v=download-0811-4" />
   </head>
   <body>
     <section id="authView" class="auth-view">
@@ -56,7 +56,7 @@
         <button class="rail-button" data-view="progress" type="button"><span>▤</span><strong>현황</strong></button>
         <button id="approvalMenuButton" class="rail-button admin-only hidden" data-view="approvals" type="button"><span>✓</span><strong>가입 승인</strong></button>
         <button id="desktopSettingsButton" class="rail-button hidden" data-view="settings" type="button"><span>⚙</span><strong>설정</strong></button>
-        <button id="resetDemo" class="rail-button rail-bottom" type="button"><span>↺</span><strong>초기화</strong></button>
+        <button id="resetDemo" class="rail-button rail-bottom" type="button"><span>↺</span><strong>새로고침</strong></button>
       </aside>
 
       <main class="feed-layout">
@@ -96,9 +96,15 @@
                 <label class="setting-row"><span><strong>미션 알림</strong><small>미션 게시글이 새로 올라오면 따로 알립니다.</small></span><input type="checkbox" data-desktop-setting="notifyMissions" /></label>
               </div>
               <div class="settings-card">
+                <div class="setting-row download-folder-row">
+                  <span><strong>다운로드 폴더</strong><small id="desktopDownloadDirPath">기본 다운로드 폴더 사용</small></span>
+                  <button id="desktopDownloadDirButton" class="mini-button" type="button">폴더 선택</button>
+                </div>
+              </div>
+              <div class="settings-card">
                 <div class="setting-row">
                   <span><strong>알림 테스트</strong><small id="desktopNotificationStatus">Windows 알림이 뜨는지 바로 확인합니다.</small></span>
-                  <button id="desktopNotificationTestButton" class="mini-button" type="button">알림 테스트</button>
+                  <button id="desktopNotificationTestButton" class="mini-button notification-test-button" type="button">알림 테스트</button>
                 </div>
               </div>
               <div class="settings-card desktop-update-card">
@@ -129,7 +135,7 @@
         <header class="compose-header"><button class="modal-close" data-action="close-compose" type="button" aria-label="닫기">×</button><h2 id="composeTitle">새 게시물 만들기</h2><span></span></header>
         <form id="postForm" class="modal-form">
           <div class="compose-fields">
-            <select id="postTypeSelect" name="type" aria-label="글 유형"><option value="general">일반 게시글</option><option value="notice">공지</option><option value="mission">미션</option><option value="question">질문</option></select>
+            <select id="postTypeSelect" name="type" aria-label="글 유형"><option value="general">일반 게시글</option><option value="notice" data-admin-only="true">공지</option><option value="mission">미션</option><option value="question">질문</option></select>
             <input name="title" placeholder="제목" required />
             <textarea name="body" placeholder="내용" required></textarea>
             <div class="date-grid"><input name="startDate" type="date" aria-label="시작일" /><input name="dueDate" type="date" aria-label="마감일" /></div><label class="completion-toggle"><input type="checkbox" name="completionRules" value="done" /> 완료 확인 사용</label>
@@ -145,10 +151,14 @@
     </div>
 
     <template id="emptyTemplate"><div class="empty">아직 등록된 내용이 없습니다.</div></template>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-config.js?v=supabase-2"></script>
+    <script src="vendor/supabase-js.js"></script>
+    <script src="vendor/hls.min.js"></script>
+    <script src="supabase-config.js?v=supabase-0811-1"></script>
     <script src="app-state.js?v=completion-users-1"></script>
-    <script src="supabase-client.js?v=avatar-upload-1"></script>
-    <script src="app.js?v=version-notification-1"></script>
+    <script src="supabase-client.js?v=remote-mux-0811-1"></script>
+    <script src="app-session.js?v=session-0811-1"></script>
+    <script src="app-drive.js?v=drive-0811-1"></script>
+    <script src="app-compose.js?v=compose-0811-1"></script>
+    <script src="app.js?v=prod-0811-16"></script>
   </body>
 </html>
