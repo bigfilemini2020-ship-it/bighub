@@ -15,6 +15,7 @@ const {
   recordFileDownload,
   createSignupRequest,
   approveSignupRequest,
+  rejectSignupRequest,
   authenticateUser,
   loginIdToAuthEmail,
   validateLoginId,
@@ -299,6 +300,23 @@ test("signup validates department and matching password", () => {
     password: "pass1234",
     passwordConfirm: "different",
   }, now), /비밀번호/);
+});
+
+test("signup request can be rejected", () => {
+  let state = createInitialState(now);
+  state = createSignupRequest(state, {
+    name: "reject user",
+    loginId: "rejectuser",
+    department: "운영",
+    password: "pass1234",
+    passwordConfirm: "pass1234",
+  }, now);
+
+  state = rejectSignupRequest(state, state.signupRequests[0].id, "2026-08-04T10:00:00.000Z");
+
+  assert.equal(state.signupRequests[0].status, "rejected");
+  assert.equal(state.signupRequests[0].rejectedAt, "2026-08-04T10:00:00.000Z");
+  assert.equal(authenticateUser(state, { loginId: "rejectuser", password: "pass1234" }), null);
 });
 
 test("login id maps to internal auth email", () => {

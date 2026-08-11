@@ -37,3 +37,8 @@ test("client diagnostics avoid high-frequency render logging", () => {
     assert.doesNotMatch(source, /clientLog\("render"/);
   }
 });
+test("approval UI exposes reject action", () => {
+  const app = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
+  assert.match(app, /data-action="reject-signup"/);
+  assert.match(app, /rejectProfile\(target\.dataset\.requestId\)/);
+});

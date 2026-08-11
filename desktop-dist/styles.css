@@ -2458,3 +2458,8 @@ textarea {
   white-space: nowrap;
   flex: 0 0 auto;
 }
+
+.approval-actions { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; }
+.approval-actions .mini-button { min-width: 58px; }
+.mini-button.secondary { background: #ffffff; color: #111827; border-color: #d8dee8; }
+.mini-button.secondary:hover { background: #f3f6fb; }

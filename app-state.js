@@ -258,6 +258,15 @@
     };
   }
 
+  function rejectSignupRequest(state, requestId, now = new Date().toISOString()) {
+    const request = (state.signupRequests || []).find((item) => item.id === requestId);
+    if (!request || request.status !== "pending") return state;
+    return {
+      ...state,
+      signupRequests: state.signupRequests.map((item) => item.id === requestId ? { ...item, status: "rejected", rejectedAt: now } : item),
+    };
+  }
+
   function authenticateUser(state, input) {
     const loginId = input.loginId ? validateLoginId(input.loginId) : "";
     const name = trim(input.name);
@@ -348,6 +357,7 @@
     getPostPresentation,
     createSignupRequest,
     approveSignupRequest,
+    rejectSignupRequest,
     authenticateUser,
     loginIdToAuthEmail,
     validateLoginId,

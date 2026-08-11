@@ -217,3 +217,28 @@ test("addComment translates repeated fetch failures", async () => {
     /네트워크 연결이 불안정/
   );
 });
+test("rejectProfile marks a pending profile as rejected", async () => {
+  let updatePayload = null;
+  let eqArgs = null;
+  const fakeClient = {
+    from(table) {
+      assert.equal(table, "profiles");
+      return {
+        update(payload) {
+          updatePayload = payload;
+          return {
+            eq(column, value) {
+              eqArgs = [column, value];
+              return { error: null };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  await loadClient(fakeClient).rejectProfile("user-1");
+
+  assert.equal(updatePayload.status, "rejected");
+  assert.deepEqual(eqArgs, ["id", "user-1"]);
+});
