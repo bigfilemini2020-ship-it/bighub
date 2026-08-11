@@ -80,6 +80,53 @@ test("signUp explains already registered login ids in Korean", async () => {
   );
 });
 
+
+test("signUp reopens rejected existing accounts", async () => {
+  let signedOut = false;
+  let updatePayload = null;
+  let selectedProfileId = "";
+  const fakeClient = {
+    auth: {
+      signUp: async () => ({ data: {}, error: new Error("User already registered") }),
+      signInWithPassword: async (payload) => {
+        assert.equal(payload.email, "jang8189@bighub.local");
+        assert.equal(payload.password, "pass1234");
+        return { data: { user: { id: "user-1" } }, error: null };
+      },
+      signOut: async () => { signedOut = true; },
+    },
+    from(table) {
+      assert.equal(table, "profiles");
+      return {
+        select: () => ({
+          eq: (_column, value) => ({
+            maybeSingle: async () => ({ data: { id: value, status: "rejected" }, error: null }),
+          }),
+        }),
+        update(payload) {
+          updatePayload = payload;
+          return {
+            eq(column, value) {
+              assert.equal(column, "id");
+              selectedProfileId = value;
+              return { error: null };
+            },
+          };
+        },
+      };
+    },
+  };
+
+  await loadClient(fakeClient).signUp({ loginId: "jang8189", name: "장재민", department: "운영", password: "pass1234" });
+
+  assert.equal(updatePayload.status, "pending");
+  assert.equal(updatePayload.login_id, "jang8189");
+  assert.equal(updatePayload.name, "장재민");
+  assert.equal(updatePayload.department, "운영");
+  assert.equal(selectedProfileId, "user-1");
+  assert.equal(signedOut, true);
+});
+
 test("signIn translates profile permission errors in Korean", async () => {
   const fakeClient = {
     auth: {

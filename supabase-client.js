@@ -124,6 +124,21 @@
     return { id: row.id, postId: row.post_id, userId: row.user_id, createdAt: row.created_at };
   }
 
+  async function reopenRejectedSignup(auth, input, loginId, authEmail) {
+    const signIn = await auth.auth.signInWithPassword({ email: authEmail, password: input.password });
+    if (signIn.error || !signIn.data.user) throw new Error("이미 가입 신청된 아이디입니다. 관리자 승인 후 로그인하세요.");
+    const userId = signIn.data.user.id;
+    const { data: profile, error: profileError } = await auth.from("profiles").select("id,status").eq("id", userId).maybeSingle();
+    if (profileError) { await auth.auth.signOut(); throw new Error(userMessage(profileError)); }
+    if (!profile || profile.status !== "rejected") {
+      await auth.auth.signOut();
+      throw new Error("이미 가입 신청된 아이디입니다. 관리자 승인 후 로그인하세요.");
+    }
+    const { error: updateError } = await auth.from("profiles").update({ status: "pending", login_id: loginId, name: input.name, department: input.department }).eq("id", userId);
+    await auth.auth.signOut();
+    if (updateError) throw new Error(userMessage(updateError, "가입 재신청에 실패했습니다."));
+  }
+
   async function signUp(input) {
     const auth = client();
     const loginId = root.EducationState.validateLoginId(input.loginId);
@@ -133,7 +148,11 @@
       password: input.password,
       options: { data: { login_id: loginId, name: input.name, department: input.department } },
     });
-    if (error) throw new Error(userMessage(error, "가입 신청에 실패했습니다. 다시 시도하세요."));
+    if (error) {
+      const message = error.message || "";
+      if (/already registered|user already/i.test(message) && typeof auth.auth.signInWithPassword === "function") return reopenRejectedSignup(auth, input, loginId, authEmail);
+      throw new Error(userMessage(error, "가입 신청에 실패했습니다. 다시 시도하세요."));
+    }
     if (!data.user) throw new Error("가입 계정을 만들지 못했습니다. 다시 시도하세요.");
     const { data: profile, error: profileError } = await auth.from("profiles").select("id,status").eq("id", data.user.id).maybeSingle();
     if (profileError) throw new Error(userMessage(profileError));
