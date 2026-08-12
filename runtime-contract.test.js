@@ -123,6 +123,27 @@ test("cache-buster tokens match webAppVersion in every bundle", () => {
   }
 });
 
+// A pending user has no auth account, so signInWithPassword cannot distinguish
+// them from a wrong password. The status check inside signIn runs only after a
+// successful sign-in and never fires for them.
+test("login reports pending approval instead of bad credentials", () => {
+  const schema = fs.readFileSync(path.join(__dirname, "supabase-schema.sql"), "utf8");
+  assert.match(schema, /create or replace function public\.signup_is_pending\(login_id_input text\)/);
+  assert.ok(schema.includes("grant execute on function public.signup_is_pending(text) to anon, authenticated;"));
+  assert.doesNotMatch(schema, /signup_is_pending[\s\S]{0,400}from public\.profiles/);
+
+  for (const dir of [".", "desktop-dist"]) {
+    const client = fs.readFileSync(path.join(__dirname, dir, "supabase-client.js"), "utf8");
+    assert.match(client, /invalid login credentials/, `${dir} must branch on the auth error`);
+    assert.match(client, /rpc\("signup_is_pending", \{ login_id_input: loginId \}\)/, `${dir} must ask the database`);
+    assert.match(client, /관리자 승인 대기 중입니다/, `${dir} must say pending, not bad credentials`);
+
+    const app = fs.readFileSync(path.join(__dirname, dir, "app.js"), "utf8");
+    assert.match(app, /function showLoginError\(message\) \{[\s\S]*?alert\(message\);/, `${dir} must alert login errors`);
+    assert.doesNotMatch(app, /byId\("loginMessage"\)\.textContent = error\.message/, `${dir} must route login errors through showLoginError`);
+  }
+});
+
 test("signup lifecycle does not retain rejected requests", () => {
   const schema = fs.readFileSync(path.join(__dirname, "supabase-schema.sql"), "utf8");
   const start = schema.indexOf("create or replace function public.request_signup(");

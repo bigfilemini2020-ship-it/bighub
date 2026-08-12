@@ -435,6 +435,13 @@ function setAuthMode(mode) {
   byId("loginMessage").textContent = "";
   byId("signupMessage").textContent = "";
 }
+// Alert as well as the inline line: the inline text sits below the fold on short
+// windows and users kept missing it.
+function showLoginError(message) {
+  byId("loginMessage").textContent = message;
+  alert(message);
+}
+
 function bindAuthForms() {
   setupAuthForms();
   byId("loginForm").addEventListener("submit", async (event) => {
@@ -442,7 +449,7 @@ function bindAuthForms() {
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
       const user = remoteAuth() ? await window.BigHubSupabase.signIn(data) : S.authenticateUser(state, data);
-      if (!user) { byId("loginMessage").textContent = "\uC2B9\uC778\uB41C \uACC4\uC815\uC774 \uC5C6\uAC70\uB098 \uBE44\uBC00\uBC88\uD638\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."; return; }
+      if (!user) { showLoginError("\uC2B9\uC778\uB41C \uACC4\uC815\uC774 \uC5C6\uAC70\uB098 \uBE44\uBC00\uBC88\uD638\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."); return; }
       currentUserId = user.id;
       if (remoteAuth()) mergeRemoteUser(user);
       const rememberId = byId("rememberId").checked || byId("autoLogin").checked;
@@ -455,7 +462,7 @@ function bindAuthForms() {
       render();
       if (syncError) alert("\uB85C\uADF8\uC778\uC740 \uB410\uC9C0\uB9CC \uAC8C\uC2DC\uAE00 \uB3D9\uAE30\uD654\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. Supabase SQL \uC5C5\uB370\uC774\uD2B8\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.\n\n" + syncError);
     } catch (error) {
-      byId("loginMessage").textContent = error.message || "\uB85C\uADF8\uC778\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.";
+      showLoginError(error.message || "\uB85C\uADF8\uC778\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
     }
   });
   byId("signupForm").addEventListener("submit", async (event) => {

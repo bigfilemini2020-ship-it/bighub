@@ -289,6 +289,28 @@ begin
 end;
 $fn$;
 
+-- A pending signup has no auth.users row yet (the account is created at
+-- approval), so signInWithPassword returns "invalid login credentials" and the
+-- client cannot tell "wrong password" from "waiting for approval". The status
+-- check inside signIn runs only after a successful sign-in, which a pending user
+-- never reaches, so the client asks this on failure instead.
+--
+-- Reveals nothing the signup form does not: submitting a taken id there already
+-- returns 409 "already registered or pending". Says nothing about approved
+-- accounts, so it cannot be used to enumerate members.
+create or replace function public.signup_is_pending(login_id_input text)
+returns boolean
+language sql
+stable
+security definer
+set search_path to 'public'
+as $fn$
+  select exists (
+    select 1 from public.signup_requests
+    where login_id = lower(trim(login_id_input)) and status = 'pending'
+  );
+$fn$;
+
 -- Fallback used by the client when a plain delete removes no rows, so the UI can
 -- tell "not allowed" apart from "already gone".
 create or replace function public.delete_post(post_id_input uuid)
@@ -472,6 +494,7 @@ revoke execute on function public.is_admin() from public;
 revoke execute on function public.is_approved() from public;
 revoke execute on function public.delete_post(uuid) from public;
 revoke execute on function public.request_signup(text, text, text, text, text) from public;
+revoke execute on function public.signup_is_pending(text) from public;
 revoke execute on function public.approve_signup_request(uuid, uuid, uuid) from public;
 revoke execute on function public.reject_signup_request(uuid) from public;
 
@@ -479,6 +502,7 @@ grant execute on function public.is_admin() to authenticated;
 grant execute on function public.is_approved() to authenticated;
 grant execute on function public.delete_post(uuid) to authenticated;
 grant execute on function public.reject_signup_request(uuid) to authenticated;
+grant execute on function public.signup_is_pending(text) to anon, authenticated;
 grant execute on function public.request_signup(text, text, text, text, text) to service_role;
 grant execute on function public.approve_signup_request(uuid, uuid, uuid) to service_role;
 

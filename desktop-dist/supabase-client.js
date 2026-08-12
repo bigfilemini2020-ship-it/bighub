@@ -168,9 +168,25 @@
 
   async function signIn(input) {
     const auth = client();
-    const email = root.EducationState.loginIdToAuthEmail(input.loginId);
+    const loginId = root.EducationState.validateLoginId(input.loginId);
+    const email = root.EducationState.loginIdToAuthEmail(loginId);
     const { data, error } = await auth.auth.signInWithPassword({ email, password: input.password });
-    if (error) throw new Error(userMessage(error, "로그인에 실패했습니다. 다시 시도하세요."));
+    if (error) {
+      // A pending signup has no auth account yet, so this is indistinguishable
+      // from a wrong password. Ask the database which one it is.
+      if (String(error.message || "").toLowerCase().includes("invalid login credentials")) {
+        let pending = false;
+        // This lookup is a nicety; if it fails, report the real sign-in error.
+        try {
+          const result = await auth.rpc("signup_is_pending", { login_id_input: loginId });
+          pending = Boolean(result?.data);
+        } catch (lookupError) {
+          pending = false;
+        }
+        if (pending) throw new Error("관리자 승인 대기 중입니다. 승인 후 로그인할 수 있습니다.");
+      }
+      throw new Error(userMessage(error, "로그인에 실패했습니다. 다시 시도하세요."));
+    }
     const { data: profile, error: profileError } = await auth.from("profiles").select("*").eq("id", data.user.id).single();
     if (profileError) throw new Error(userMessage(profileError));
     if (profile.status !== "approved") {

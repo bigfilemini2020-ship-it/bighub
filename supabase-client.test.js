@@ -130,6 +130,29 @@ test("signIn translates invalid credentials in Korean", async () => {
     /아이디 또는 비밀번호/
   );
 });
+test("signIn reports pending approval when the id has a waiting request", async () => {
+  const calls = [];
+  const fakeClient = {
+    auth: {
+      signInWithPassword: async () => ({ data: {}, error: new Error("Invalid login credentials") }),
+    },
+    rpc: async (name, args) => {
+      calls.push([name, args]);
+      return { data: true, error: null };
+    },
+  };
+
+  await assert.rejects(
+    () => loadClient(fakeClient).signIn({ loginId: "Rujina", password: "bad" }),
+    /관리자 승인 대기 중입니다/
+  );
+  // Compared field by field: the client runs in a vm context, so its object
+  // literals fail deepStrictEqual's prototype check.
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], "signup_is_pending");
+  assert.equal(calls[0][1].login_id_input, "rujina");
+});
+
 test("deletePost verifies that a row was actually deleted", async () => {
   let selected = false;
   const fakeClient = {
