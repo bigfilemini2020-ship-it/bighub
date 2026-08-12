@@ -478,7 +478,6 @@ function bindAuthForms() {
         saveState();
       }
       if (typeof signupForm.reset === "function") signupForm.reset();
-      if (remoteAuth()) await refreshRemoteData();
       const successMessage = "가입 신청이 접수되었습니다. 관리자 승인 후 로그인할 수 있습니다.";
       alert(successMessage);
       setAuthMode("login");
