@@ -43,7 +43,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdDMTMzNzE0NUMzNUM2N0IKUldSN3hqVmNGRGNUZlArYjVoNENjL1FlRHQ2MXlodHRib0VQWU1XY28vYVV6ZVVGWGFENHJWRXoK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDkzMTc3MEQzM0IwMEYwOEYKUldTUDhBQTcwM0FYazVtNE05TkpLRGc0MWM1eFJNRVN5RmgwQkN0MVNOZkFiUmZPckxqVFQvckcK",
       "endpoints": [
         "https://github.com/bigfilemini2020-ship-it/bighub/releases/latest/download/latest.json"
       ],

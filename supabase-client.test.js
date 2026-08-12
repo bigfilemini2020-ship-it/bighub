@@ -29,19 +29,33 @@ test("signUp creates a temporary signup request instead of an Auth user", async 
     return { ok: true, json: async () => ({ ok: true }) };
   };
 
-  await loadClient(fakeClient, fetchImpl).signUp({ loginId: "Rujina", name: "user", department: "ops", password: "123456" });
+  await loadClient(fakeClient, fetchImpl).signUp({ loginId: "Rujina", name: "user", department: "ops", password: "123456", passwordConfirm: "123456" });
 
   assert.equal(calledAuthSignup, false);
-  assert.deepEqual(requestBody, { loginId: "rujina", name: "user", department: "ops", password: "123456" });
+  assert.deepEqual(requestBody, { loginId: "rujina", name: "user", department: "ops", password: "123456", passwordConfirm: "123456" });
 });
 
 test("signUp reports duplicate signup request messages from the function", async () => {
   const fetchImpl = async () => ({ ok: false, status: 409, json: async () => ({ error: "이미 가입 신청된 아이디입니다." }) });
 
   await assert.rejects(
-    () => loadClient({}, fetchImpl).signUp({ loginId: "rujina", name: "user", department: "ops", password: "123456" }),
-    /이미 가입 신청된 아이디/
+    () => loadClient({}, fetchImpl).signUp({ loginId: "rujina", name: "user", department: "ops", password: "123456", passwordConfirm: "123456" }),
+    (error) => error.status === 409 && /이미 가입되었거나 가입 신청 중인 아이디/.test(error.message)
   );
+});
+
+test("signUp rejects mismatched password confirmation before requesting signup", async () => {
+  let called = false;
+  const fetchImpl = async () => {
+    called = true;
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+
+  await assert.rejects(
+    () => loadClient({}, fetchImpl).signUp({ loginId: "rujina", name: "user", department: "ops", password: "123456", passwordConfirm: "654321" }),
+    /비밀번호 확인이 일치하지 않습니다/
+  );
+  assert.equal(called, false);
 });
 
 test("listSignupRequests reads pending temporary requests", async () => {
@@ -99,7 +113,7 @@ test("signIn translates profile permission errors in Korean", async () => {
   };
 
   await assert.rejects(
-    () => loadClient(fakeClient).signIn({ loginId: "rujina", password: "123456" }),
+    () => loadClient(fakeClient).signIn({ loginId: "rujina", password: "123456", passwordConfirm: "123456" }),
     /가입\/로그인 정보 저장 권한/
   );
 });

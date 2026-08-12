@@ -40,7 +40,7 @@
 
   function validateLoginId(value) {
     const loginId = trim(value).toLowerCase();
-    if (!/^[a-z0-9._-]{2,32}$/.test(loginId)) throw new Error("아이디는 영문 소문자, 숫자, 점, 밑줄, 하이픈으로 2~32자 입력하세요");
+    if (!/^[a-z0-9._-]{3,32}$/.test(loginId)) throw new Error("아이디는 영문 소문자, 숫자, 점, 밑줄, 하이픈으로 3~32자 입력하세요");
     return loginId;
   }
 

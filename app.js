@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-signup-alert-1";
+const webAppVersion = "2026.08.12-signup-flow-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -12,6 +12,7 @@ let postFilter = "all";
 let shouldRestoreFeedPosition = true;
 let feedPositionSaveTimer = 0;
 let remoteSyncInFlight = false;
+let signupInFlight = false;
 let desktopSettings = null;
 let desktopNotificationsArmed = false;
 let desktopUpdateInfo = null;
@@ -459,8 +460,16 @@ function bindAuthForms() {
   });
   byId("signupForm").addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (signupInFlight) return;
     const signupForm = event.currentTarget;
+    const submitButton = signupForm.querySelector('button[type="submit"]');
+    const submitLabel = submitButton?.textContent || "가입 신청";
     const data = Object.fromEntries(new FormData(signupForm));
+    signupInFlight = true;
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "처리 중...";
+    }
     try {
       if (remoteAuth()) {
         await window.BigHubSupabase.signUp(data);
@@ -470,20 +479,28 @@ function bindAuthForms() {
       }
       if (typeof signupForm.reset === "function") signupForm.reset();
       if (remoteAuth()) await refreshRemoteData();
+      const successMessage = "가입 신청이 접수되었습니다. 관리자 승인 후 로그인할 수 있습니다.";
+      alert(successMessage);
       setAuthMode("login");
-      byId("loginMessage").textContent = "\uAC00\uC785 \uC2E0\uCCAD\uC774 \uC811\uC218\uB410\uC2B5\uB2C8\uB2E4. \uAD00\uB9AC\uC790 \uC2B9\uC778 \uD6C4 \uB85C\uADF8\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
-      alert("\uAC00\uC785 \uC2E0\uCCAD\uC774 \uC811\uC218\uB410\uC2B5\uB2C8\uB2E4. \uAD00\uB9AC\uC790 \uC2B9\uC778 \uD6C4 \uB85C\uADF8\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
+      byId("loginMessage").textContent = successMessage;
       render();
     } catch (error) {
-      const message = error.message || "\uAC00\uC785 \uC2E0\uCCAD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.";
-      if (message.includes("\uC774\uBBF8 \uAC00\uC785") || message.includes("\uAC00\uC785 \uC2E0\uCCAD\uB41C") || message.includes("\uAD00\uB9AC\uC790 \uC2B9\uC778") || message.includes("\uC2B9\uC778 \uD6C4 \uB85C\uADF8\uC778")) {
+      const message = error.message || "가입 신청에 실패했습니다.";
+      const isDuplicate = error?.status === 409 || message.includes("이미 사용 중") || message.includes("이미 가입") || message.includes("가입 신청된");
+      if (isDuplicate) {
+        setAuthMode("signup");
+        byId("signupMessage").textContent = message;
         alert(message);
-        setAuthMode("login");
-        byId("loginMessage").textContent = message;
         return;
       }
       byId("signupMessage").textContent = message;
-      alert("\uAC00\uC785 \uC2E0\uCCAD \uC2E4\uD328: " + message);
+      alert("가입 신청 실패: " + message);
+    } finally {
+      signupInFlight = false;
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = submitLabel;
+      }
     }
   });
 }
@@ -1155,20 +1172,58 @@ document.addEventListener("click", async (event) => {
     return;
   }
   if (target.dataset.action === "approve-signup") {
+    clientLog("signup-approve-click", { requestId: target.dataset.requestId || "" });
+    const originalText = target.textContent;
+    target.disabled = true;
+    target.textContent = "\uCC98\uB9AC \uC911";
     if (remoteAuth()) {
-      try { await window.BigHubSupabase.approveProfile(target.dataset.requestId); await refreshRemoteData(); render(); }
-      catch (error) { alert(error.message || "\uAC00\uC785 \uC2B9\uC778 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."); }
+      try {
+        await window.BigHubSupabase.approveProfile(target.dataset.requestId);
+        await refreshRemoteData();
+        render();
+        clientLog("signup-approve-success", { requestId: target.dataset.requestId || "" });
+        showAppToast("\uAC00\uC785 \uC2E0\uCCAD\uC744 \uC2B9\uC778\uD588\uC2B5\uB2C8\uB2E4.");
+      } catch (error) {
+        target.disabled = false;
+        target.textContent = originalText;
+        clientLog("signup-approve-error", { requestId: target.dataset.requestId || "", message: error.message || String(error || "") });
+        alert(error.message || "\uAC00\uC785 \uC2B9\uC778 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+      }
       return;
     }
     state = S.approveSignupRequest(state, target.dataset.requestId);
+    saveState();
+    render();
+    showAppToast("\uAC00\uC785 \uC2E0\uCCAD\uC744 \uC2B9\uC778\uD588\uC2B5\uB2C8\uB2E4.");
+    return;
   }
   if (target.dataset.action === "reject-signup") {
+    clientLog("signup-reject-click", { requestId: target.dataset.requestId || "" });
+    const originalText = target.textContent;
+    target.disabled = true;
+    target.textContent = "\uCC98\uB9AC \uC911";
     if (remoteAuth()) {
-      try { await window.BigHubSupabase.rejectProfile(target.dataset.requestId); await refreshRemoteData(); render(); }
-      catch (error) { alert(error.message || "\uAC00\uC785 \uAC70\uC808 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."); }
+      try {
+        await window.BigHubSupabase.rejectProfile(target.dataset.requestId);
+        state = S.rejectSignupRequest(state, target.dataset.requestId);
+        render();
+        await refreshRemoteData();
+        render();
+        clientLog("signup-reject-success", { requestId: target.dataset.requestId || "" });
+        showAppToast("\uAC00\uC785 \uC2E0\uCCAD\uC744 \uAC70\uC808\uD588\uC2B5\uB2C8\uB2E4.");
+      } catch (error) {
+        target.disabled = false;
+        target.textContent = originalText;
+        clientLog("signup-reject-error", { requestId: target.dataset.requestId || "", message: error.message || String(error || "") });
+        alert(error.message || "\uAC00\uC785 \uAC70\uC808 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+      }
       return;
     }
     state = S.rejectSignupRequest(state, target.dataset.requestId);
+    saveState();
+    render();
+    showAppToast("\uAC00\uC785 \uC2E0\uCCAD\uC744 \uAC70\uC808\uD588\uC2B5\uB2C8\uB2E4.");
+    return;
   }
   saveState();
   render();

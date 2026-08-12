@@ -1,4 +1,4 @@
-﻿const assert = require("node:assert/strict");
+const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
@@ -41,6 +41,7 @@ test("approval UI exposes reject action", () => {
   const app = fs.readFileSync(path.join(__dirname, "app.js"), "utf8");
   assert.match(app, /data-action="reject-signup"/);
   assert.match(app, /rejectProfile\(target\.dataset\.requestId\)/);
+  assert.match(app, /rejectSignupRequest\(state, target\.dataset\.requestId\);/);
 });
 
 
@@ -61,17 +62,26 @@ test("signup edge functions are wired to request table and admin auth", () => {
   const requestSignup = fs.readFileSync(path.join(__dirname, "supabase/functions/request-signup/index.ts"), "utf8");
   const approveSignup = fs.readFileSync(path.join(__dirname, "supabase/functions/approve-signup/index.ts"), "utf8");
   const rejectSignup = fs.readFileSync(path.join(__dirname, "supabase/functions/reject-signup/index.ts"), "utf8");
+  const schema = fs.readFileSync(path.join(__dirname, "supabase-schema.sql"), "utf8");
   assert.ok(requestSignup.includes("/rest/v1/rpc/request_signup"));
   assert.match(requestSignup, /BIGHUB_SIGNUP_SECRET/);
   assert.match(requestSignup, /function defaultSecret/);
-  assert.match(requestSignup, /SUPABASE_PUBLISHABLE_KEYS/);
-  assert.doesNotMatch(requestSignup, /SUPABASE_SECRET_KEYS/);
+  assert.match(requestSignup, /SUPABASE_SECRET_KEYS/);
+  assert.doesNotMatch(requestSignup, /SUPABASE_PUBLISHABLE_KEYS/);
+  assert.match(requestSignup, /passwordConfirm/);
   assert.match(approveSignup, /SUPABASE_PUBLISHABLE_KEYS/);
-  assert.match(approveSignup, /Authorization: "Bearer " \+ key/);
+  assert.match(approveSignup, /if \(!key.startsWith\("sb_secret_"\)\) headers.Authorization = "Bearer " \+ key/);
   assert.match(approveSignup, /auth\/v1\/admin\/users/);
-  assert.match(approveSignup, /password_ciphertext: null/);
-  assert.match(rejectSignup, /method: "DELETE"/);
+  assert.match(approveSignup, /rpc\/approve_signup_request/);
+  assert.ok(rejectSignup.includes("/rest/v1/rpc/reject_signup_request"));
+  assert.match(rejectSignup, /bearerToken\(req\)/);
+  assert.doesNotMatch(rejectSignup, /auth\/v1\/user/);
+  assert.match(rejectSignup, /alreadyHandled/);
   assert.doesNotMatch(rejectSignup, /status: "rejected"/);
+  assert.match(schema, /create or replace function public\.approve_signup_request/);
+  assert.match(schema, /grant execute on function public\.request_signup\(text, text, text, text, text\) to service_role/);
+  assert.match(schema, /create or replace function public\.reject_signup_request/);
+  assert.match(schema, /grant execute on function public\.reject_signup_request\(uuid\) to authenticated/);
   for (const source of [requestSignup, approveSignup, rejectSignup]) {
     assert.ok(source.includes('replace(/\\/$/, "")'));
     assert.ok(!source.includes('replace(//$/, "")'));
@@ -81,10 +91,43 @@ test("signup edge functions are wired to request table and admin auth", () => {
 
 
 
-test("admin signup edge functions send bearer auth for secret keys", () => {
-  for (const file of ["supabase/functions/approve-signup/index.ts", "supabase/functions/reject-signup/index.ts"]) {
+test("admin signup edge functions keep opaque secret keys out of bearer auth", () => {
+  for (const file of ["supabase/functions/approve-signup/index.ts"]) {
     const source = fs.readFileSync(path.join(__dirname, file), "utf8");
-    assert.match(source, /Authorization: "Bearer " \+ key/);
-    assert.doesNotMatch(source, /if (!key.startsWith("sb_secret_")) headers.Authorization/);
+    assert.match(source, /if \(!key.startsWith\("sb_secret_"\)\) headers.Authorization = "Bearer " \+ key/);
+    assert.doesNotMatch(source, /return \{ apikey: key, Authorization: "Bearer " \+ key/);
   }
+});
+
+test("signup schema has one canonical lifecycle definition", () => {
+  const schema = fs.readFileSync(path.join(__dirname, "supabase-schema.sql"), "utf8");
+  const count = (pattern) => (schema.match(pattern) || []).length;
+  assert.equal(count(/create or replace function public\.request_signup\(/g), 1);
+  assert.equal(count(/create or replace function public\.approve_signup_request\(/g), 1);
+  assert.equal(count(/create or replace function public\.reject_signup_request\(/g), 1);
+  assert.equal(count(/create policy "admins select signup requests"/g), 1);
+  assert.doesNotMatch(schema, /approved_at = coalesce\(public\.profiles\.approved_at, now\(\)\);\r?\n\s+then/);
+});
+
+// ponytail: 캐시버스터를 손으로 맞춘다. 자산이 늘거나 배포가 잦아지면 index.html 생성 스텝으로 올려라.
+test("cache-buster tokens match webAppVersion in every bundle", () => {
+  for (const dir of [".", "desktop-dist"]) {
+    const app = fs.readFileSync(path.join(__dirname, dir, "app.js"), "utf8");
+    const version = app.match(/const webAppVersion = "([^"]+)"/)?.[1];
+    assert.ok(version, `${dir}/app.js must declare webAppVersion`);
+    const html = fs.readFileSync(path.join(__dirname, dir, "index.html"), "utf8");
+    const stale = Array.from(html.matchAll(/(?:src|href)="([^"?]+)\?v=([^"]+)"/g))
+      .filter(([, , token]) => token !== version)
+      .map(([, asset, token]) => `${asset}?v=${token}`);
+    assert.deepEqual(stale, [], `${dir}/index.html cache-busters must be ?v=${version}`);
+  }
+});
+
+test("signup lifecycle does not retain rejected requests", () => {
+  const schema = fs.readFileSync(path.join(__dirname, "supabase-schema.sql"), "utf8");
+  const start = schema.indexOf("create or replace function public.request_signup(");
+  const end = schema.indexOf("$fn$;", start);
+  const requestSignup = schema.slice(start, end);
+  assert.doesNotMatch(requestSignup, /existing_request_status = 'rejected'/);
+  assert.doesNotMatch(requestSignup, /status = 'rejected'/);
 });

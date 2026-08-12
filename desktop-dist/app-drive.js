@@ -148,6 +148,14 @@ function setDownloadStatus(message, progress = 0, tone = "active") {
   }
 }
 
+function showAppToast(message, tone = "success") {
+  const toast = ensureDownloadToast();
+  window.clearTimeout(downloadToastTimer);
+  toast.className = `download-toast ${tone}`;
+  toast.innerHTML = `<strong>${escapeHtml(message)}</strong><span>\uC644\uB8CC</span><i style="--progress:100%"></i>`;
+  downloadToastTimer = window.setTimeout(() => toast.classList.add("hidden"), 2200);
+}
+
 function driveFunctionBaseUrl() {
   const config = window.BigHubConfig || {};
   const baseUrl = String(config.supabaseUrl || "").replace(/\/$/, "");

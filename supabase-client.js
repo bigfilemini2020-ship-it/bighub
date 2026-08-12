@@ -22,7 +22,11 @@
     if (token) headers.Authorization = "Bearer " + token;
     const response = await (root.fetch || fetch)(functionUrl(name), { method: "POST", headers, body: JSON.stringify(body || {}) });
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || "요청 처리에 실패했습니다.");
+    if (!response.ok) {
+      const error = new Error(payload.error || "요청 처리에 실패했습니다.");
+      error.status = response.status;
+      throw error;
+    }
     return payload;
   }
 
@@ -139,7 +143,17 @@
 
   async function signUp(input) {
     const loginId = root.EducationState.validateLoginId(input.loginId);
-    await callFunction("request-signup", { loginId, name: input.name, department: input.department, password: input.password });
+    if (input.password !== input.passwordConfirm) throw new Error("비밀번호 확인이 일치하지 않습니다.");
+    try {
+      await callFunction("request-signup", { loginId, name: input.name, department: input.department, password: input.password, passwordConfirm: input.passwordConfirm });
+    } catch (error) {
+      if (error?.status === 409) {
+        const duplicate = new Error("이미 가입되었거나 가입 신청 중인 아이디입니다.");
+        duplicate.status = 409;
+        throw duplicate;
+      }
+      throw error;
+    }
   }
 
   function toSignupRequest(row) {

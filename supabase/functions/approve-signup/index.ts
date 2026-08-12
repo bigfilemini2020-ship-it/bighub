@@ -23,7 +23,9 @@ function defaultSecret(name: string, legacyName: string) {
 
 function serviceHeaders() {
   const key = defaultSecret("SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY");
-  return { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" };
+  const headers: Record<string, string> = { apikey: key, "Content-Type": "application/json" };
+  if (!key.startsWith("sb_secret_")) headers.Authorization = "Bearer " + key;
+  return headers;
 }
 
 function anonHeaders(token: string) {
@@ -94,6 +96,15 @@ async function findAuthUserByEmail(email: string) {
   return users.find((user: { id?: string; email?: string }) => String(user.email || "").toLowerCase() === email.toLowerCase()) || null;
 }
 
+async function updateAuthUser(id: string, password: string, request: SignupRequest) {
+  const response = await fetch(baseUrl() + "/auth/v1/admin/users/" + encodeURIComponent(id), {
+    method: "PUT",
+    headers: serviceHeaders(),
+    body: JSON.stringify({ password, email_confirm: true, user_metadata: { login_id: request.login_id, name: request.name, department: request.department } }),
+  });
+  if (!response.ok) throw new HttpError(500, "기존 Auth 계정 정보를 갱신하지 못했습니다.");
+}
+
 async function createOrFindAuthUser(email: string, password: string, request: SignupRequest) {
   const body = { email, password, email_confirm: true, user_metadata: { login_id: request.login_id, name: request.name, department: request.department } };
   const userResponse = await fetch(baseUrl() + "/auth/v1/admin/users", {
@@ -107,10 +118,13 @@ async function createOrFindAuthUser(email: string, password: string, request: Si
   const detail = String(userPayload.msg || userPayload.error_description || userPayload.error || "");
   if (/already|registered|exists|duplicate/i.test(detail)) {
     const existing = await findAuthUserByEmail(email);
-    if (existing?.id) return { user: existing, created: false };
+    if (existing?.id) {
+      await updateAuthUser(existing.id, password, request);
+      return { user: existing, created: false };
+    }
   }
 
-  throw new HttpError(500, detail || "Auth \uACC4\uC815 \uC0DD\uC131\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+  throw new HttpError(500, detail || "Auth 계정 생성에 실패했습니다.");
 }
 
 async function deleteAuthUser(id: string) {
@@ -136,31 +150,14 @@ Deno.serve(async (req) => {
     const password = await decryptPassword(request.password_ciphertext, request.password_iv);
     const { user: userPayload, created } = await createOrFindAuthUser(email, password, request);
 
-    const now = new Date().toISOString();
-    const profile = {
-      id: userPayload.id,
-      login_id: request.login_id,
-      auth_email: email,
-      name: request.name,
-      department: request.department,
-      role: "member",
-      status: "approved",
-      avatar: String(request.name || "?").slice(0, 1),
-      approved_at: now,
-      approved_by: admin.id,
-    };
-    const profileResponse = await fetch(baseUrl() + "/rest/v1/profiles?on_conflict=id", {
-      method: "POST",
-      headers: { ...serviceHeaders(), Prefer: "resolution=merge-duplicates" },
-      body: JSON.stringify(profile),
-    });
-    if (!profileResponse.ok) {
-      if (created) await deleteAuthUser(userPayload.id);
-      throw new HttpError(500, "\uD504\uB85C\uD544 \uC0DD\uC131\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
-    }
-
     try {
-      await patchRequest(request.id, { status: "approved", password_ciphertext: null, password_iv: null, decided_at: now, decided_by: admin.id, user_id: userPayload.id });
+      const response = await fetch(baseUrl() + "/rest/v1/rpc/approve_signup_request", {
+        method: "POST",
+        headers: serviceHeaders(),
+        body: JSON.stringify({ request_id_input: request.id, user_id_input: userPayload.id, approved_by_input: admin.id }),
+      });
+      const approved = await response.json().catch(() => false);
+      if (!response.ok || approved !== true) throw new HttpError(409, "이미 처리된 가입 신청입니다.");
     } catch (error) {
       if (created) await deleteAuthUser(userPayload.id);
       throw error;

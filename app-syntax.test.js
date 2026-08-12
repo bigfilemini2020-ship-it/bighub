@@ -1,4 +1,4 @@
-﻿const assert = require("node:assert/strict");
+const assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
 const test = require("node:test");
 
@@ -15,8 +15,8 @@ test("session code is split into its own browser bundle", () => {
 
   for (const htmlFile of ["index.html", "desktop-dist/index.html"]) {
     const html = require("node:fs").readFileSync(htmlFile, "utf8");
-    const sessionIndex = html.indexOf('app-session.js?v=session-0811-1');
-    const appIndex = html.indexOf('app.js?v=prod-0811-16');
+    const sessionIndex = html.indexOf('app-session.js?v=');
+    const appIndex = html.indexOf('"app.js?v=');
     assert.notEqual(sessionIndex, -1, `${htmlFile} loads app-session.js`);
     assert.notEqual(appIndex, -1, `${htmlFile} loads current app.js bundle`);
     assert.ok(sessionIndex < appIndex, `${htmlFile} loads session before app`);
@@ -56,9 +56,9 @@ test("drive and attachment transport code is split into its own browser bundle",
 
   for (const htmlFile of ["index.html", "desktop-dist/index.html"]) {
     const html = require("node:fs").readFileSync(htmlFile, "utf8");
-    const sessionIndex = html.indexOf('app-session.js?v=session-0811-1');
-    const driveIndex = html.indexOf('app-drive.js?v=drive-0811-1');
-    const appIndex = html.indexOf('app.js?v=prod-0811-16');
+    const sessionIndex = html.indexOf('app-session.js?v=');
+    const driveIndex = html.indexOf('app-drive.js?v=');
+    const appIndex = html.indexOf('"app.js?v=');
     assert.notEqual(driveIndex, -1, `${htmlFile} loads app-drive.js`);
     assert.notEqual(appIndex, -1, `${htmlFile} loads current app.js bundle`);
     assert.ok(sessionIndex < driveIndex, `${htmlFile} loads drive after session`);
@@ -115,9 +115,9 @@ test("compose form code is split into its own browser bundle", () => {
 
   for (const htmlFile of ["index.html", "desktop-dist/index.html"]) {
     const html = require("node:fs").readFileSync(htmlFile, "utf8");
-    const driveIndex = html.indexOf('app-drive.js?v=drive-0811-1');
-    const composeIndex = html.indexOf('app-compose.js?v=compose-0811-1');
-    const appIndex = html.indexOf('app.js?v=prod-0811-16');
+    const driveIndex = html.indexOf('app-drive.js?v=');
+    const composeIndex = html.indexOf('app-compose.js?v=');
+    const appIndex = html.indexOf('"app.js?v=');
     assert.notEqual(composeIndex, -1, `${htmlFile} loads app-compose.js`);
     assert.notEqual(appIndex, -1, `${htmlFile} loads current app.js bundle`);
     assert.ok(driveIndex < composeIndex, `${htmlFile} loads compose after drive`);
@@ -155,23 +155,21 @@ test("compose form code is split into its own browser bundle", () => {
     assert.ok(compose.includes(marker), `compose bundle contains ${marker}`);
   }
 });
-test("signup submit keeps form reference and guides duplicate requests", () => {
+test("signup submit keeps form reference and preserves success or duplicate state", () => {
   for (const file of ["app.js", "desktop-dist/app.js"]) {
     const app = require("node:fs").readFileSync(file, "utf8");
     assert.match(app, /const signupForm = event.currentTarget/);
     assert.ok(app.includes("new FormData(signupForm)"));
     assert.ok(app.includes("signupForm.reset()"));
     assert.ok(!app.includes("event.currentTarget.reset"));
-    assert.ok(app.includes('message.includes("\\uC774\\uBBF8 \\uAC00\\uC785")'));
-    assert.ok(app.includes('message.includes("\\uAC00\\uC785 \\uC2E0\\uCCAD\\uB41C")'));
-    assert.ok(app.includes('message.includes("\\uAD00\\uB9AC\\uC790 \\uC2B9\\uC778")'));
-    assert.ok(app.includes('message.includes("\\uC2B9\\uC778 \\uD6C4 \\uB85C\\uADF8\\uC778")'));
-    assert.ok(app.includes("alert(message);"));
-    assert.ok(app.includes('byId("loginMessage").textContent = message'));
+    assert.ok(app.includes("if (signupInFlight) return;"));
+    assert.ok(app.includes('error?.status === 409'));
+    assert.ok(app.includes('submitButton.disabled = true'));
+    assert.ok(app.includes('byId("loginMessage").textContent = successMessage'));
+    assert.ok(app.includes('byId("signupMessage").textContent = message'));
     assert.ok(app.includes('setAuthMode("login")'));
   }
 });
-
 
 test("signup approval buttons surface remote failures", () => {
   for (const file of ["app.js", "desktop-dist/app.js"]) {
@@ -183,5 +181,21 @@ test("signup approval buttons surface remote failures", () => {
     assert.ok(app.includes('catch (error)'));
     assert.ok(app.includes('\\uAC00\\uC785 \\uC2B9\\uC778 \\uCC98\\uB9AC\\uC5D0 \\uC2E4\\uD328\\uD588\\uC2B5\\uB2C8\\uB2E4.'));
     assert.ok(app.includes('\\uAC00\\uC785 \\uAC70\\uC808 \\uCC98\\uB9AC\\uC5D0 \\uC2E4\\uD328\\uD588\\uC2B5\\uB2C8\\uB2E4.'));
+  }
+});
+
+
+test("signup approval actions use non-blocking completion toast", () => {
+  const fs = require("node:fs");
+  for (const file of ["app.js", "desktop-dist/app.js"]) {
+    const app = fs.readFileSync(file, "utf8");
+    assert.ok(app.includes('showAppToast("\\uAC00\\uC785 \\uC2E0\\uCCAD\\uC744 \\uAC70\\uC808'));
+    assert.ok(app.includes('showAppToast("\\uAC00\\uC785 \\uC2E0\\uCCAD\\uC744 \\uC2B9\\uC778'));
+  }
+  for (const file of ["app-drive.js", "desktop-dist/app-drive.js"]) {
+    const drive = fs.readFileSync(file, "utf8");
+    assert.ok(drive.includes("function showAppToast("));
+    assert.ok(drive.includes("<span>\\uC644\\uB8CC</span>"));
+    assert.ok(drive.includes("<span>\\uC644\\uB8CC</span>"));
   }
 });

@@ -25,10 +25,10 @@ function defaultSecret(name: string, legacyName: string) {
   throw new HttpError(500, "\uD658\uACBD \uBCC0\uC218 " + name + ".default\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.");
 }
 
-function publicHeaders() {
-  const key = defaultSecret("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY");
+function serviceHeaders() {
+  const key = defaultSecret("SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY");
   const headers: Record<string, string> = { apikey: key, "Content-Type": "application/json" };
-  if (!key.startsWith("sb_publishable_")) headers.Authorization = "Bearer " + key;
+  if (!key.startsWith("sb_secret_")) headers.Authorization = "Bearer " + key;
   return headers;
 }
 
@@ -65,7 +65,7 @@ async function saveSignup(input: {
 }) {
   const response = await fetch(baseUrl() + "/rest/v1/rpc/request_signup", {
     method: "POST",
-    headers: publicHeaders(),
+    headers: serviceHeaders(),
     body: JSON.stringify({
       login_id_input: input.login_id,
       name_input: input.name,
@@ -88,10 +88,12 @@ Deno.serve(async (req) => {
     const name = String(input.name || "").trim();
     const department = String(input.department || "").trim();
     const password = String(input.password || "");
+    const passwordConfirm = String(input.passwordConfirm || "");
 
     if (!name) throw new HttpError(400, "\uC774\uB984\uC744 \uC785\uB825\uD558\uC138\uC694.");
     if (!DEPARTMENTS.has(department)) throw new HttpError(400, "\uBD80\uC11C\uB97C \uB2E4\uC2DC \uC120\uD0DD\uD558\uC138\uC694.");
     if (password.length < 6) throw new HttpError(400, "\uBE44\uBC00\uBC88\uD638\uB294 6\uC790 \uC774\uC0C1 \uC785\uB825\uD558\uC138\uC694.");
+    if (password !== passwordConfirm) throw new HttpError(400, "\uBE44\uBC00\uBC88\uD638 \uD655\uC778\uC774 \uC77C\uCE58\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.");
 
     await saveSignup({ login_id, name, department, ...(await encryptPassword(password)) });
     return json({ ok: true });

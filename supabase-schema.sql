@@ -12,7 +12,7 @@ create table if not exists public.profiles (
   login_id text not null unique check (login_id ~ '^[a-z0-9._-]{3,32}$'),
   auth_email text not null unique,
   name text not null,
-  department text not null check (department in ('임원', '경영지원', '개발', '운영', '마케팅', '기타')),
+  department text not null check (department in ('?꾩썝', '寃쎌쁺吏??, '媛쒕컻', '?댁쁺', '留덉???, '湲고?')),
   role text not null default 'member' check (role in ('admin', 'member')),
   status text not null default 'approved' check (status in ('approved', 'rejected')),
   avatar text,
@@ -25,7 +25,7 @@ create table if not exists public.signup_requests (
   id uuid primary key default gen_random_uuid(),
   login_id text not null unique check (login_id ~ '^[a-z0-9._-]{3,32}$'),
   name text not null,
-  department text not null check (department in ('임원', '경영지원', '개발', '운영', '마케팅', '기타')),
+  department text not null check (department in ('?꾩썝', '寃쎌쁺吏??, '媛쒕컻', '?댁쁺', '留덉???, '湲고?')),
   password_ciphertext text,
   password_iv text,
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
@@ -173,77 +173,95 @@ begin
   department_input := trim(department_input);
 
   if login_id_input !~ '^[a-z0-9._-]{3,32}$' then
-    return jsonb_build_object('ok', false, 'status', 400, 'error', '아이디는 영문 소문자, 숫자, 점, 밑줄, 하이픈으로 3~32자 입력하세요.');
+    return jsonb_build_object('ok', false, 'status', 400, 'error', 'invalid-login-id');
   end if;
-
   if name_input = '' then
-    return jsonb_build_object('ok', false, 'status', 400, 'error', '이름을 입력하세요.');
+    return jsonb_build_object('ok', false, 'status', 400, 'error', 'missing-name');
   end if;
-
-  if department_input not in ('임원', '경영지원', '개발', '운영', '마케팅', '기타') then
-    return jsonb_build_object('ok', false, 'status', 400, 'error', '부서를 다시 선택하세요.');
+  if department_input not in (U&'\C784\C6D0', U&'\ACBD\C601\C9C0\C6D0', U&'\AC1C\BC1C', U&'\C6B4\C601', U&'\B9C8\CF00\D305', U&'\AE30\D0C0') then
+    return jsonb_build_object('ok', false, 'status', 400, 'error', 'invalid-department');
   end if;
-
+  if coalesce(password_ciphertext_input, '') = '' or coalesce(password_iv_input, '') = '' then
+    return jsonb_build_object('ok', false, 'status', 400, 'error', 'missing-encrypted-password');
+  end if;
   if exists (select 1 from public.profiles where login_id = login_id_input and status = 'approved') then
-    return jsonb_build_object('ok', false, 'status', 409, 'error', '이미 가입 완료된 아이디입니다.');
+    return jsonb_build_object('ok', false, 'status', 409, 'error', 'signup-already-approved');
   end if;
-
   if (select count(*) from public.signup_requests where status = 'pending' and created_at > now() - interval '10 minutes') >= 50 then
-    return jsonb_build_object('ok', false, 'status', 429, 'error', 'Too many signup requests. Please try again later.');
+    return jsonb_build_object('ok', false, 'status', 429, 'error', 'signup-rate-limited');
   end if;
 
-  insert into public.signup_requests (
-    login_id,
-    name,
-    department,
-    password_ciphertext,
-    password_iv,
-    status,
-    created_at,
-    decided_at,
-    decided_by,
-    user_id
-  ) values (
-    login_id_input,
-    name_input,
-    department_input,
-    password_ciphertext_input,
-    password_iv_input,
-    'pending',
-    now(),
-    null,
-    null,
-    null
-  )
-  on conflict (login_id) do update set
+  insert into public.signup_requests (login_id, name, department, password_ciphertext, password_iv, status, created_at, decided_at, decided_by, user_id)
+  values (login_id_input, name_input, department_input, password_ciphertext_input, password_iv_input, 'pending', now(), null, null, null)
+  on conflict (login_id) do nothing;
+  if found then return jsonb_build_object('ok', true); end if;
+
+  select status into existing_request_status from public.signup_requests where login_id = login_id_input;
+  if existing_request_status = 'pending' then
+    return jsonb_build_object('ok', false, 'status', 409, 'error', 'signup-pending');
+  end if;
+  return jsonb_build_object('ok', false, 'status', 409, 'error', 'signup-already-approved');
+end;
+$fn$;
+
+create or replace function public.approve_signup_request(
+  request_id_input uuid,
+  user_id_input uuid,
+  approved_by_input uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  request_row public.signup_requests%rowtype;
+  approved_now timestamptz := now();
+begin
+  select * into request_row
+  from public.signup_requests
+  where id = request_id_input and status = 'pending'
+  for update;
+  if not found then return false; end if;
+
+  insert into public.profiles (id, login_id, auth_email, name, department, role, status, avatar, approved_at, approved_by)
+  values (user_id_input, request_row.login_id, request_row.login_id || '@bighub.local', request_row.name, request_row.department, 'member', 'approved', left(request_row.name, 1), approved_now, approved_by_input)
+  on conflict (id) do update set
+    login_id = excluded.login_id,
+    auth_email = excluded.auth_email,
     name = excluded.name,
     department = excluded.department,
-    password_ciphertext = excluded.password_ciphertext,
-    password_iv = excluded.password_iv,
-    status = 'pending',
-    created_at = now(),
-    decided_at = null,
-    decided_by = null,
-    user_id = null
-  where public.signup_requests.status = 'rejected';
+    role = 'member',
+    status = 'approved',
+    avatar = excluded.avatar,
+    approved_at = excluded.approved_at,
+    approved_by = excluded.approved_by;
 
-  if not found then
-    select status into existing_request_status
-    from public.signup_requests
-    where login_id = login_id_input;
-
-    if existing_request_status = 'pending' then
-      return jsonb_build_object('ok', false, 'status', 409, 'error', '이미 가입 신청된 아이디입니다. 관리자 승인 후 로그인하세요.');
-    end if;
-
-    if existing_request_status = 'approved' then
-      return jsonb_build_object('ok', false, 'status', 409, 'error', '이미 가입 완료된 아이디입니다.');
-    end if;
-
-    return jsonb_build_object('ok', false, 'status', 500, 'error', '가입 신청 저장에 실패했습니다.');
+  update public.signup_requests
+  set status = 'approved', password_ciphertext = null, password_iv = null, decided_at = approved_now, decided_by = approved_by_input, user_id = user_id_input
+  where id = request_id_input and status = 'pending';
+  return found;
+end;
+$fn$;
+create or replace function public.reject_signup_request(request_id_input uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  deleted_count integer := 0;
+begin
+  if auth.uid() is null or not public.is_admin() then
+    raise exception 'Admin only.';
   end if;
 
-  return jsonb_build_object('ok', true);
+  delete from public.signup_requests
+  where id = request_id_input
+    and status = 'pending';
+
+  get diagnostics deleted_count = row_count;
+  return deleted_count > 0;
 end;
 $fn$;
 
@@ -261,10 +279,16 @@ revoke execute on function public.is_admin() from public;
 revoke execute on function public.is_approved() from public;
 revoke execute on function public.delete_post(uuid) from public;
 revoke execute on function public.request_signup(text, text, text, text, text) from public;
+revoke execute on function public.request_signup(text, text, text, text, text) from anon, authenticated;
+revoke execute on function public.approve_signup_request(uuid, uuid, uuid) from public;
+revoke execute on function public.approve_signup_request(uuid, uuid, uuid) from anon, authenticated;
+revoke execute on function public.reject_signup_request(uuid) from public;
 grant execute on function public.is_admin() to authenticated;
 grant execute on function public.is_approved() to authenticated;
 grant execute on function public.delete_post(uuid) to authenticated;
-grant execute on function public.request_signup(text, text, text, text, text) to anon;
+grant execute on function public.request_signup(text, text, text, text, text) to service_role;
+grant execute on function public.approve_signup_request(uuid, uuid, uuid) to service_role;
+grant execute on function public.reject_signup_request(uuid) to authenticated;
 
 create index if not exists comments_parent_id_idx on public.comments(parent_id);
 create index if not exists comments_post_id_idx on public.comments(post_id);
@@ -385,7 +409,7 @@ with check ((select public.is_approved()) and user_id = (select auth.uid()));
 
 -- Run after creating Auth user admin@bighub.local in Authentication > Users.
 insert into public.profiles (id, login_id, auth_email, name, department, role, status, avatar, approved_at)
-select id, 'admin', 'admin@bighub.local', '관리자', '임원', 'admin', 'approved', '관', now()
+select id, 'admin', 'admin@bighub.local', '愿由ъ옄', '?꾩썝', 'admin', 'approved', '愿', now()
 from auth.users
 where email = 'admin@bighub.local'
 on conflict (id) do update set

@@ -322,7 +322,7 @@ test("login id maps to internal auth email", () => {
   assert.equal(validateLoginId("kim_01"), "kim_01");
   assert.equal(loginIdToAuthEmail(" Kim_01 "), "kim_01@bighub.local");
   assert.throws(() => validateLoginId("김민수"), /아이디/);
-  assert.equal(validateLoginId("mk"), "mk");
+  assert.throws(() => validateLoginId("mk"));
   assert.throws(() => validateLoginId("a"), /아이디/);
 });
 
