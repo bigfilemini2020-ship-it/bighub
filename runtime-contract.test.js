@@ -42,3 +42,31 @@ test("approval UI exposes reject action", () => {
   assert.match(app, /data-action="reject-signup"/);
   assert.match(app, /rejectProfile\(target\.dataset\.requestId\)/);
 });
+
+
+test("signup request schema uses temporary requests", () => {
+  const schema = fs.readFileSync(path.join(__dirname, "supabase-schema.sql"), "utf8");
+  assert.match(schema, /create table if not exists public.signup_requests/);
+  assert.match(schema, /password_ciphertext text/);
+  assert.match(schema, /create policy "admins select signup requests"/);
+  assert.match(schema, /drop trigger if exists on_auth_user_created on auth.users/);
+  assert.doesNotMatch(schema, /create trigger on_auth_user_created/);
+  assert.doesNotMatch(schema, /create policy "profiles insert own pending"/);
+  assert.match(schema, /type <> 'notice' or public.is_admin()/);
+});
+
+test("signup edge functions are wired to request table and admin auth", () => {
+  const requestSignup = fs.readFileSync(path.join(__dirname, "supabase/functions/request-signup/index.ts"), "utf8");
+  const approveSignup = fs.readFileSync(path.join(__dirname, "supabase/functions/approve-signup/index.ts"), "utf8");
+  const rejectSignup = fs.readFileSync(path.join(__dirname, "supabase/functions/reject-signup/index.ts"), "utf8");
+  assert.ok(requestSignup.includes("signup_requests?on_conflict=login_id"));
+  assert.match(requestSignup, /BIGHUB_SIGNUP_SECRET/);
+  assert.match(requestSignup, /auth\/v1\/admin\/users\//);
+  assert.match(approveSignup, /auth\/v1\/admin\/users/);
+  assert.match(approveSignup, /password_ciphertext: null/);
+  assert.match(rejectSignup, /status: "rejected"/);
+  for (const source of [requestSignup, approveSignup, rejectSignup]) {
+    assert.ok(source.includes('replace(/\\/$/, "")'));
+    assert.ok(!source.includes('replace(//$/, "")'));
+  }
+});

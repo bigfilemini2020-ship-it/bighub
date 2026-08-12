@@ -1,34 +1,27 @@
 # BigHub Supabase setup
 
-1. Supabase SQL Editor에서 `supabase-schema.sql` 전체를 실행한다.
-   - 가입 신청용 profile 자동 생성 trigger가 포함되어 있다.
-   - 로그인/승인에 필요한 `profiles` 테이블 `GRANT` 권한이 포함되어 있다.
-   - 기존에 Auth만 생성되고 profile이 빠진 사용자도 복구한다.
-2. Authentication > Sign In / Providers > Email에서 `Confirm email`을 끈다.
-3. Authentication > Users에서 관리자 계정을 만든다.
+1. In Supabase SQL Editor, run `supabase-schema.sql`.
+2. Authentication > Sign In / Providers > Email: turn off email confirmation for this MVP.
+3. Authentication > Users: create the admin user.
    - Email: `admin@bighub.local`
-   - Password: 원하는 관리자 비밀번호
-   - Auto Confirm User: 켜기
-4. SQL Editor에서 `supabase-schema.sql` 전체를 다시 실행한다.
-   - 마지막 admin seed가 관리자 profile을 승인 상태로 만든다.
-5. Project Settings > API에서 값을 복사해 `supabase-config.js`에 넣는다.
+   - Password: your admin password
+   - Auto Confirm User: on
+4. Run `supabase-schema.sql` again so the final admin seed block creates/updates the admin profile.
+5. Project Settings > API: copy values into `supabase-config.js`.
    - Project URL -> `supabaseUrl`
-   - Publishable key 또는 anon public key -> `supabaseAnonKey`
-6. `service_role` secret key는 브라우저 코드나 GitHub에 넣지 않는다.
+   - anon/public key -> `supabaseAnonKey`
+6. Edge Function secrets: set every value listed in `supabase/functions/README.md`.
+7. Deploy Edge Functions listed in `supabase/functions/README.md`.
 
-로그인 방식:
-
-```text
-사용자 입력: kim / password
-내부 Auth: kim@bighub.local / password
-```
-
-가입 신청 흐름:
+Signup flow:
 
 ```text
-사용자가 가입 신청
--> Supabase Auth user 생성
--> DB trigger가 profiles에 pending profile 자동 생성
--> 관리자가 BigHub의 가입 승인 메뉴에서 승인
--> 사용자가 로그인 가능
+User submits signup request
+-> request-signup saves row in signup_requests only
+-> Admin sees pending signup_requests in BigHub
+-> Admin approve creates Supabase Auth user and approved profile
+-> Admin reject marks request rejected and clears encrypted password data
+-> Rejected login_id can submit a fresh request again
 ```
+
+The old direct pending-profile signup flow is disabled. `profiles` should represent real users, not temporary signup requests.

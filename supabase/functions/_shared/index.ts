@@ -43,7 +43,7 @@ export async function requireApprovedUser(req: Request) {
   const profiles = await profileResponse.json().catch(() => []);
   if (!profileResponse.ok) throw new HttpError(500, "사용자 승인 정보를 확인할 수 없습니다.");
   if (!Array.isArray(profiles) || profiles[0]?.status !== "approved") {
-    throw new HttpError(403, "승인된 사용자만 파일을 올릴 수 있습니다.");
+    throw new HttpError(403, "승인된 사용자만 파일을 열 수 있습니다.");
   }
 
   return user;

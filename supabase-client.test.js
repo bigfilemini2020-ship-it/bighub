@@ -3,128 +3,85 @@ const { readFileSync } = require("node:fs");
 const test = require("node:test");
 const vm = require("node:vm");
 
-function loadClient(fakeClient) {
+function loadClient(fakeClient = {}, fetchImpl = fetch) {
   const window = {
     BigHubConfig: { supabaseUrl: "https://example.supabase.co", supabaseAnonKey: "public" },
     EducationState: {
       validateLoginId(value) { return String(value).trim().toLowerCase(); },
-      loginIdToAuthEmail(value) { return `${String(value).trim().toLowerCase()}@bighub.local`; },
+      loginIdToAuthEmail(value) { return String(value).trim().toLowerCase() + "@bighub.local"; },
     },
     supabase: { createClient: () => fakeClient },
+    fetch: fetchImpl,
   };
-  vm.runInNewContext(readFileSync("supabase-client.js", "utf8"), { window, setTimeout });
+  vm.runInNewContext(readFileSync("supabase-client.js", "utf8"), { window, fetch: fetchImpl, setTimeout, URL });
   return window.BigHubSupabase;
 }
 
-test("signUp waits for trigger-created pending profile", async () => {
-  let signedOut = false;
-  let selectedTable = "";
-  const fakeClient = {
-    auth: {
-      signUp: async (payload) => {
-        assert.equal(payload.email, "rujina@bighub.local");
-        assert.equal(payload.options.data.department, "ops");
-        return { data: { user: { id: "user-1" } }, error: null };
-      },
-      signOut: async () => { signedOut = true; },
-    },
-    from(table) {
-      selectedTable = table;
-      return {
-        select: () => ({
-          eq: (_column, value) => ({
-            maybeSingle: async () => ({ data: { id: value, status: "pending" }, error: null }),
-          }),
-        }),
-      };
-    },
+test("signUp creates a temporary signup request instead of an Auth user", async () => {
+  let calledAuthSignup = false;
+  let requestBody = null;
+  const fakeClient = { auth: { signUp: async () => { calledAuthSignup = true; return { data: {}, error: null }; } } };
+  const fetchImpl = async (url, options) => {
+    assert.equal(url, "https://example.supabase.co/functions/v1/request-signup");
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers.apikey, "public");
+    requestBody = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ ok: true }) };
   };
 
-  await loadClient(fakeClient).signUp({ loginId: "Rujina", name: "user", department: "ops", password: "123456" });
+  await loadClient(fakeClient, fetchImpl).signUp({ loginId: "Rujina", name: "user", department: "ops", password: "123456" });
 
-  assert.equal(selectedTable, "profiles");
-  assert.equal(signedOut, true);
+  assert.equal(calledAuthSignup, false);
+  assert.deepEqual(requestBody, { loginId: "rujina", name: "user", department: "ops", password: "123456" });
 });
 
-test("signUp reports missing profile trigger setup", async () => {
-  const fakeClient = {
-    auth: {
-      signUp: async () => ({ data: { user: { id: "user-1" } }, error: null }),
-      signOut: async () => {},
-    },
-    from() {
-      return {
-        select: () => ({
-          eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }),
-        }),
-      };
-    },
-  };
+test("signUp reports duplicate signup request messages from the function", async () => {
+  const fetchImpl = async () => ({ ok: false, status: 409, json: async () => ({ error: "이미 가입 신청된 아이디입니다." }) });
 
   await assert.rejects(
-    () => loadClient(fakeClient).signUp({ loginId: "kim", name: "user", department: "dev", password: "123456" }),
-    /Supabase SQL/
-  );
-});
-
-test("signUp explains already registered login ids in Korean", async () => {
-  const fakeClient = {
-    auth: {
-      signUp: async () => ({ data: {}, error: new Error("User already registered") }),
-    },
-  };
-
-  await assert.rejects(
-    () => loadClient(fakeClient).signUp({ loginId: "rujina", name: "user", department: "ops", password: "123456" }),
+    () => loadClient({}, fetchImpl).signUp({ loginId: "rujina", name: "user", department: "ops", password: "123456" }),
     /이미 가입 신청된 아이디/
   );
 });
 
-
-test("signUp reopens rejected existing accounts", async () => {
-  let signedOut = false;
-  let updatePayload = null;
-  let selectedProfileId = "";
+test("listSignupRequests reads pending temporary requests", async () => {
+  const rows = [{ id: "req-1", login_id: "kim", name: "김", department: "운영", status: "pending", created_at: "now" }];
   const fakeClient = {
-    auth: {
-      signUp: async () => ({ data: {}, error: new Error("User already registered") }),
-      signInWithPassword: async (payload) => {
-        assert.equal(payload.email, "jang8189@bighub.local");
-        assert.equal(payload.password, "pass1234");
-        return { data: { user: { id: "user-1" } }, error: null };
-      },
-      signOut: async () => { signedOut = true; },
-    },
     from(table) {
-      assert.equal(table, "profiles");
-      return {
-        select: () => ({
-          eq: (_column, value) => ({
-            maybeSingle: async () => ({ data: { id: value, status: "rejected" }, error: null }),
-          }),
-        }),
-        update(payload) {
-          updatePayload = payload;
-          return {
-            eq(column, value) {
-              assert.equal(column, "id");
-              selectedProfileId = value;
-              return { error: null };
-            },
-          };
-        },
-      };
+      assert.equal(table, "signup_requests");
+      return { select: () => ({ eq: () => ({ order: async () => ({ data: rows, error: null }) }) }) };
     },
   };
 
-  await loadClient(fakeClient).signUp({ loginId: "jang8189", name: "장재민", department: "운영", password: "pass1234" });
+  const requests = await loadClient(fakeClient).listSignupRequests();
 
-  assert.equal(updatePayload.status, "pending");
-  assert.equal(updatePayload.login_id, "jang8189");
-  assert.equal(updatePayload.name, "장재민");
-  assert.equal(updatePayload.department, "운영");
-  assert.equal(selectedProfileId, "user-1");
-  assert.equal(signedOut, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(requests)), [{ id: "req-1", loginId: "kim", name: "김", department: "운영", status: "pending", createdAt: "now" }]);
+});
+
+test("approveProfile calls approve-signup function", async () => {
+  let body = null;
+  const fetchImpl = async (url, options) => {
+    assert.equal(url, "https://example.supabase.co/functions/v1/approve-signup");
+    body = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+
+  await loadClient({ auth: { getSession: async () => ({ data: { session: { access_token: "token" } } }) } }, fetchImpl).approveProfile("req-1");
+
+  assert.deepEqual(body, { requestId: "req-1" });
+});
+
+test("rejectProfile calls reject-signup function", async () => {
+  let body = null;
+  const fetchImpl = async (url, options) => {
+    assert.equal(url, "https://example.supabase.co/functions/v1/reject-signup");
+    body = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+
+  await loadClient({ auth: { getSession: async () => ({ data: { session: { access_token: "token" } } }) } }, fetchImpl).rejectProfile("req-1");
+
+  assert.deepEqual(body, { requestId: "req-1" });
 });
 
 test("signIn translates profile permission errors in Korean", async () => {
@@ -263,29 +220,4 @@ test("addComment translates repeated fetch failures", async () => {
     () => loadClient(fakeClient).addComment({ postId: "post-1", userId: "user-1", body: "test" }),
     /네트워크 연결이 불안정/
   );
-});
-test("rejectProfile marks a pending profile as rejected", async () => {
-  let updatePayload = null;
-  let eqArgs = null;
-  const fakeClient = {
-    from(table) {
-      assert.equal(table, "profiles");
-      return {
-        update(payload) {
-          updatePayload = payload;
-          return {
-            eq(column, value) {
-              eqArgs = [column, value];
-              return { error: null };
-            },
-          };
-        },
-      };
-    },
-  };
-
-  await loadClient(fakeClient).rejectProfile("user-1");
-
-  assert.equal(updatePayload.status, "rejected");
-  assert.deepEqual(eqArgs, ["id", "user-1"]);
 });

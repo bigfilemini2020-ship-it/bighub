@@ -13,6 +13,19 @@
     return root.supabase.createClient(item.supabaseUrl, item.supabaseAnonKey);
   }
 
+  function functionUrl(name) {
+    return String(config().supabaseUrl || "").replace(/\/$/, "") + "/functions/v1/" + name;
+  }
+
+  async function callFunction(name, body, token = "") {
+    const headers = { "Content-Type": "application/json", apikey: config().supabaseAnonKey };
+    if (token) headers.Authorization = "Bearer " + token;
+    const response = await (root.fetch || fetch)(functionUrl(name), { method: "POST", headers, body: JSON.stringify(body || {}) });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || "요청 처리에 실패했습니다.");
+    return payload;
+  }
+
   function rawErrorDetail(error) {
     return [error?.message, error?.details, error?.hint, error?.code].filter(Boolean).join(" / ");
   }
@@ -124,40 +137,19 @@
     return { id: row.id, postId: row.post_id, userId: row.user_id, createdAt: row.created_at };
   }
 
-  async function reopenRejectedSignup(auth, input, loginId, authEmail) {
-    const signIn = await auth.auth.signInWithPassword({ email: authEmail, password: input.password });
-    if (signIn.error || !signIn.data.user) throw new Error("이미 가입 신청된 아이디입니다. 관리자 승인 후 로그인하세요.");
-    const userId = signIn.data.user.id;
-    const { data: profile, error: profileError } = await auth.from("profiles").select("id,status").eq("id", userId).maybeSingle();
-    if (profileError) { await auth.auth.signOut(); throw new Error(userMessage(profileError)); }
-    if (!profile || profile.status !== "rejected") {
-      await auth.auth.signOut();
-      throw new Error("이미 가입 신청된 아이디입니다. 관리자 승인 후 로그인하세요.");
-    }
-    const { error: updateError } = await auth.from("profiles").update({ status: "pending", login_id: loginId, name: input.name, department: input.department }).eq("id", userId);
-    await auth.auth.signOut();
-    if (updateError) throw new Error(userMessage(updateError, "가입 재신청에 실패했습니다."));
+  async function signUp(input) {
+    const loginId = root.EducationState.validateLoginId(input.loginId);
+    await callFunction("request-signup", { loginId, name: input.name, department: input.department, password: input.password });
   }
 
-  async function signUp(input) {
-    const auth = client();
-    const loginId = root.EducationState.validateLoginId(input.loginId);
-    const authEmail = root.EducationState.loginIdToAuthEmail(loginId);
-    const { data, error } = await auth.auth.signUp({
-      email: authEmail,
-      password: input.password,
-      options: { data: { login_id: loginId, name: input.name, department: input.department } },
-    });
-    if (error) {
-      const message = error.message || "";
-      if (/already registered|user already/i.test(message) && typeof auth.auth.signInWithPassword === "function") return reopenRejectedSignup(auth, input, loginId, authEmail);
-      throw new Error(userMessage(error, "가입 신청에 실패했습니다. 다시 시도하세요."));
-    }
-    if (!data.user) throw new Error("가입 계정을 만들지 못했습니다. 다시 시도하세요.");
-    const { data: profile, error: profileError } = await auth.from("profiles").select("id,status").eq("id", data.user.id).maybeSingle();
-    if (profileError) throw new Error(userMessage(profileError));
-    if (!profile) throw new Error("가입 신청 저장 설정이 아직 적용되지 않았습니다. Supabase SQL 업데이트 후 다시 신청하세요.");
-    await auth.auth.signOut();
+  function toSignupRequest(row) {
+    return { id: row.id, loginId: row.login_id, name: row.name, department: row.department, status: row.status, createdAt: row.created_at };
+  }
+
+  async function listSignupRequests() {
+    const { data, error } = await client().from("signup_requests").select("id,login_id,name,department,status,created_at").eq("status", "pending").order("created_at", { ascending: true });
+    if (error) throw new Error(userMessage(error, "가입 신청 목록을 불러오지 못했습니다."));
+    return (data || []).map(toSignupRequest);
   }
 
   async function signIn(input) {
@@ -294,13 +286,11 @@
   }
 
   async function approveProfile(id) {
-    const { error } = await client().from("profiles").update({ status: "approved", approved_at: new Date().toISOString() }).eq("id", id);
-    if (error) throw new Error(userMessage(error, "\uAC00\uC785 \uC2B9\uC778 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."));
+    await callFunction("approve-signup", { requestId: id }, await accessToken());
   }
 
   async function rejectProfile(id) {
-    const { error } = await client().from("profiles").update({ status: "rejected" }).eq("id", id);
-    if (error) throw new Error(userMessage(error, "가입 거절 처리에 실패했습니다."));
+    await callFunction("reject-signup", { requestId: id }, await accessToken());
   }
 
   async function updateAvatar(avatar) {
@@ -312,5 +302,5 @@
     if (error) throw new Error(userMessage(error, "\uD504\uB85C\uD544 \uC0AC\uC9C4 \uC800\uC7A5 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. Supabase SQL \uC5C5\uB370\uC774\uD2B8\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4."));
   }
 
-  root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, listContent, createPost, updatePost, deletePost, addReaction, addComment, deleteComment, recordFileDownload, approveProfile, rejectProfile, updateAvatar, accessToken };
+  root.BigHubSupabase = { isConfigured, signUp, signIn, signOut, currentProfile, listProfiles, listSignupRequests, listContent, createPost, updatePost, deletePost, addReaction, addComment, deleteComment, recordFileDownload, approveProfile, rejectProfile, updateAvatar, accessToken };
 })(window);
