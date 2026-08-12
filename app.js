@@ -467,7 +467,7 @@ function bindAuthForms() {
         state = S.createSignupRequest(state, data);
         saveState();
       }
-      if (typeof form.reset === "function") form.reset();
+      if (typeof event.currentTarget.reset === "function") event.currentTarget.reset();
       byId("signupMessage").textContent = "가입 신청이 접수됐습니다. 관리자 승인 후 로그인할 수 있습니다.";
       if (remoteAuth()) await refreshRemoteData();
       setAuthMode("login");

@@ -169,8 +169,8 @@ async function driveHeaders() {
   return { ...(await authHeaders()), apikey: config.supabaseAnonKey };
 }
 
-function driveDownloadUrl(id, name) {
-  return driveFunctionUrl("drive-download", { id, name });
+function driveDownloadUrl(id, name, postId = "") {
+  return driveFunctionUrl("drive-download", { id, name, postId });
 }
 
 function normalizeDriveDownloadUrl(value) {
@@ -247,8 +247,9 @@ async function uploadDriveFile(file) {
 async function downloadDriveFile(url, postId) {
   setDownloadStatus("다운로드 준비 중", 8);
   const params = driveDownloadParams(url);
+  const downloadUrl = postId ? withDrivePostId(url, postId) : normalizeDriveDownloadUrl(url);
   try {
-    const response = await fetch(normalizeDriveDownloadUrl(url), { headers: await driveHeaders() });
+    const response = await fetch(downloadUrl, { headers: await driveHeaders() });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.error || "파일 다운로드에 실패했습니다.");
@@ -280,6 +281,17 @@ async function downloadDriveFile(url, postId) {
     console.warn("Download record skipped", error);
   }
 }
+function withDrivePostId(url, postId) {
+  const normalized = normalizeDriveDownloadUrl(url);
+  try {
+    const parsed = new URL(normalized, location.href);
+    if (parsed.pathname.includes("/functions/v1/drive-download")) parsed.searchParams.set("postId", postId);
+    return parsed.toString();
+  } catch {
+    return normalized;
+  }
+}
+
 function isDriveDownloadUrl(url) {
   const value = String(url || "");
   return value.includes("/functions/v1/drive-download") || value.includes("/api/drive/download");

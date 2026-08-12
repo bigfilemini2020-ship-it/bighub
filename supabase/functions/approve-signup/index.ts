@@ -2,7 +2,7 @@ import { corsHeaders, HttpError, json } from "../_shared/index.ts";
 
 function env(name: string) {
   const value = Deno.env.get(name);
-  if (!value) throw new HttpError(500, "환경 변수 " + name + "가 없습니다.");
+  if (!value) throw new HttpError(500, "\uD658\uACBD \uBCC0\uC218 " + name + "\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.");
   return value;
 }
 
@@ -18,7 +18,7 @@ function defaultSecret(name: string, legacyName: string) {
   }
   const legacy = Deno.env.get(legacyName);
   if (legacy) return legacy;
-  throw new HttpError(500, "환경 변수 " + name + ".default가 없습니다.");
+  throw new HttpError(500, "\uD658\uACBD \uBCC0\uC218 " + name + ".default\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.");
 }
 
 function serviceHeaders() {
@@ -34,16 +34,16 @@ function anonHeaders(token: string) {
 
 async function currentAdmin(req: Request) {
   const token = String(req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!token) throw new HttpError(401, "로그인이 필요합니다.");
+  if (!token) throw new HttpError(401, "\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.");
 
   const userResponse = await fetch(baseUrl() + "/auth/v1/user", { headers: anonHeaders(token) });
-  if (!userResponse.ok) throw new HttpError(401, "로그인 정보를 확인할 수 없습니다.");
+  if (!userResponse.ok) throw new HttpError(401, "\uB85C\uADF8\uC778 \uC815\uBCF4\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
   const user = await userResponse.json();
 
   const profileResponse = await fetch(baseUrl() + "/rest/v1/profiles?id=eq." + encodeURIComponent(user.id) + "&select=role,status", { headers: anonHeaders(token) });
   const profiles = await profileResponse.json().catch(() => []);
   if (!profileResponse.ok || profiles[0]?.role !== "admin" || profiles[0]?.status !== "approved") {
-    throw new HttpError(403, "관리자만 처리할 수 있습니다.");
+    throw new HttpError(403, "\uAD00\uB9AC\uC790\uB9CC \uCC98\uB9AC\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
   }
   return user;
 }
@@ -75,7 +75,7 @@ async function decryptPassword(ciphertext: string, iv: string) {
 async function getRequest(id: string): Promise<SignupRequest> {
   const response = await fetch(baseUrl() + "/rest/v1/signup_requests?id=eq." + encodeURIComponent(id) + "&select=*", { headers: serviceHeaders() });
   const rows = await response.json().catch(() => []);
-  if (!response.ok || !rows[0]) throw new HttpError(404, "가입 신청을 찾을 수 없습니다.");
+  if (!response.ok || !rows[0]) throw new HttpError(404, "\uAC00\uC785 \uC2E0\uCCAD\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
   return rows[0];
 }
 
@@ -85,31 +85,58 @@ async function patchRequest(id: string, payload: Record<string, unknown>) {
     headers: serviceHeaders(),
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new HttpError(500, "가입 신청 상태 변경에 실패했습니다.");
+  if (!response.ok) throw new HttpError(500, "\uAC00\uC785 \uC2E0\uCCAD \uC0C1\uD0DC \uBCC0\uACBD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+}
+
+async function findAuthUserByEmail(email: string) {
+  const response = await fetch(baseUrl() + "/auth/v1/admin/users?page=1&per_page=1000", { headers: serviceHeaders() });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new HttpError(500, "Auth \uC0AC\uC6A9\uC790 \uBAA9\uB85D\uC744 \uD655\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+  const users = Array.isArray(payload.users) ? payload.users : [];
+  return users.find((user: { id?: string; email?: string }) => String(user.email || "").toLowerCase() === email.toLowerCase()) || null;
+}
+
+async function createOrFindAuthUser(email: string, password: string, request: SignupRequest) {
+  const body = { email, password, email_confirm: true, user_metadata: { login_id: request.login_id, name: request.name, department: request.department } };
+  const userResponse = await fetch(baseUrl() + "/auth/v1/admin/users", {
+    method: "POST",
+    headers: serviceHeaders(),
+    body: JSON.stringify(body),
+  });
+  const userPayload = await userResponse.json().catch(() => ({}));
+  if (userResponse.ok && userPayload.id) return { user: userPayload, created: true };
+
+  const detail = String(userPayload.msg || userPayload.error_description || userPayload.error || "");
+  if (/already|registered|exists|duplicate/i.test(detail)) {
+    const existing = await findAuthUserByEmail(email);
+    if (existing?.id) return { user: existing, created: false };
+  }
+
+  throw new HttpError(500, detail || "Auth \uACC4\uC815 \uC0DD\uC131\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+}
+
+async function deleteAuthUser(id: string) {
+  const response = await fetch(baseUrl() + "/auth/v1/admin/users/" + encodeURIComponent(id), {
+    method: "DELETE",
+    headers: serviceHeaders(),
+  });
+  if (!response.ok) console.warn("Auth rollback failed", await response.text().catch(() => ""));
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
-    if (req.method !== "POST") throw new HttpError(405, "POST 요청만 가능합니다.");
+    if (req.method !== "POST") throw new HttpError(405, "POST \uC694\uCCAD\uB9CC \uAC00\uB2A5\uD569\uB2C8\uB2E4.");
     const admin = await currentAdmin(req);
     const { requestId } = await req.json().catch(() => ({}));
     const request = await getRequest(String(requestId || ""));
 
-    if (request.status !== "pending") throw new HttpError(409, "대기 중인 가입 신청만 승인할 수 있습니다.");
-    if (!request.password_ciphertext || !request.password_iv) throw new HttpError(409, "가입 신청 비밀번호 정보가 없습니다. 다시 신청해야 합니다.");
+    if (request.status !== "pending") throw new HttpError(409, "\uB300\uAE30 \uC911\uC778 \uAC00\uC785 \uC2E0\uCCAD\uB9CC \uC2B9\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
+    if (!request.password_ciphertext || !request.password_iv) throw new HttpError(409, "\uAC00\uC785 \uC2E0\uCCAD \uBE44\uBC00\uBC88\uD638 \uC815\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uC2E0\uCCAD\uD574\uC57C \uD569\uB2C8\uB2E4.");
 
     const email = request.login_id + "@bighub.local";
     const password = await decryptPassword(request.password_ciphertext, request.password_iv);
-    const userResponse = await fetch(baseUrl() + "/auth/v1/admin/users", {
-      method: "POST",
-      headers: serviceHeaders(),
-      body: JSON.stringify({ email, password, email_confirm: true, user_metadata: { login_id: request.login_id, name: request.name, department: request.department } }),
-    });
-    const userPayload = await userResponse.json().catch(() => ({}));
-    if (!userResponse.ok || !userPayload.id) {
-      throw new HttpError(500, userPayload.msg || userPayload.error_description || "Auth 계정 생성에 실패했습니다.");
-    }
+    const { user: userPayload, created } = await createOrFindAuthUser(email, password, request);
 
     const now = new Date().toISOString();
     const profile = {
@@ -129,11 +156,19 @@ Deno.serve(async (req) => {
       headers: { ...serviceHeaders(), Prefer: "resolution=merge-duplicates" },
       body: JSON.stringify(profile),
     });
-    if (!profileResponse.ok) throw new HttpError(500, "프로필 생성에 실패했습니다.");
+    if (!profileResponse.ok) {
+      if (created) await deleteAuthUser(userPayload.id);
+      throw new HttpError(500, "\uD504\uB85C\uD544 \uC0DD\uC131\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+    }
 
-    await patchRequest(request.id, { status: "approved", password_ciphertext: null, password_iv: null, decided_at: now, decided_by: admin.id, user_id: userPayload.id });
+    try {
+      await patchRequest(request.id, { status: "approved", password_ciphertext: null, password_iv: null, decided_at: now, decided_by: admin.id, user_id: userPayload.id });
+    } catch (error) {
+      if (created) await deleteAuthUser(userPayload.id);
+      throw error;
+    }
     return json({ ok: true, userId: userPayload.id });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "가입 승인에 실패했습니다." }, error instanceof HttpError ? error.status : 500);
+    return json({ error: error instanceof Error ? error.message : "\uAC00\uC785 \uC2B9\uC778\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4." }, error instanceof HttpError ? error.status : 500);
   }
 });

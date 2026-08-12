@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
@@ -54,7 +54,7 @@ test("signup request schema uses temporary requests", () => {
   assert.match(schema, /drop trigger if exists on_auth_user_created on auth.users/);
   assert.doesNotMatch(schema, /create trigger on_auth_user_created/);
   assert.doesNotMatch(schema, /create policy "profiles insert own pending"/);
-  assert.match(schema, /type <> 'notice' or public.is_admin()/);
+  assert.match(schema, /type <> 'notice' or \(select public\.is_admin\(\)\)/);
 });
 
 test("signup edge functions are wired to request table and admin auth", () => {
@@ -76,3 +76,5 @@ test("signup edge functions are wired to request table and admin auth", () => {
     assert.ok(!source.includes('replace(//$/, "")'));
   }
 });
+
+

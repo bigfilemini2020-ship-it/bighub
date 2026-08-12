@@ -120,7 +120,7 @@ test("desktop Drive downloads fetch through Supabase and save through native fil
     assert.match(source, /function setDownloadStatus\(/);
     assert.match(source, /function driveDownloadParams\(/);
     assert.match(download, /setDownloadStatus\([^\n]+, 8\)/);
-    assert.match(download, /fetch\(normalizeDriveDownloadUrl\(url\), \{ headers: await driveHeaders\(\) \}\)/);
+    assert.ok(download.includes("fetch(downloadUrl, { headers: await driveHeaders() })"));
     assert.match(download, /desktopInvoke\("save_downloaded_file", \{ input: \{ name: filename, data: Array\.from\(new Uint8Array\(await blob\.arrayBuffer\(\)\)\) \} \}\)/);
     assert.doesNotMatch(download, /desktopInvoke\("download_drive_file"/);
     assert.match(download, /setDownloadStatus\([^\n]+, 100, "success"\)/);
@@ -253,5 +253,28 @@ test("post form uses JavaScript submit handler without inline cancellation", () 
     const source = fs.readFileSync(path.join(__dirname, file), "utf8");
     assert.match(source, /<form id="postForm" class="modal-form">/);
     assert.doesNotMatch(source, /onsubmit="return false;"/);
+  }
+});
+
+test("signup submit resets the submitted form without referencing a missing form variable", () => {
+  for (const bundle of bundles) {
+    const source = fs.readFileSync(path.join(__dirname, bundle), "utf8");
+    const start = source.indexOf('byId("signupForm").addEventListener("submit"');
+    const end = source.indexOf("function loadImage", start);
+    const signup = source.slice(start, end);
+    assert.match(signup, /event.currentTarget.reset/);
+    assert.doesNotMatch(signup, /form.reset/);
+  }
+});
+
+test("Drive downloads attach postId before fetching", () => {
+  for (const bundle of driveBundles) {
+    const source = fs.readFileSync(path.join(__dirname, bundle), "utf8");
+    const start = source.indexOf("async function downloadDriveFile(url, postId)");
+    const end = source.indexOf("function isDriveDownloadUrl(url)", start);
+    const download = source.slice(start, end);
+    assert.ok(source.includes("function withDrivePostId(url, postId)"));
+    assert.ok(download.includes("const downloadUrl = postId ? withDrivePostId(url, postId) : normalizeDriveDownloadUrl(url);"));
+    assert.ok(download.includes("fetch(downloadUrl, { headers: await driveHeaders() })"));
   }
 });

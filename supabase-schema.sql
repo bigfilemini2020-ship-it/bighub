@@ -188,6 +188,10 @@ begin
     return jsonb_build_object('ok', false, 'status', 409, 'error', '이미 가입 완료된 아이디입니다.');
   end if;
 
+  if (select count(*) from public.signup_requests where status = 'pending' and created_at > now() - interval '10 minutes') >= 50 then
+    return jsonb_build_object('ok', false, 'status', 429, 'error', 'Too many signup requests. Please try again later.');
+  end if;
+
   insert into public.signup_requests (
     login_id,
     name,
@@ -246,127 +250,138 @@ $fn$;
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.profiles to authenticated;
 revoke update on public.profiles from authenticated;
-grant update (avatar, status, approved_at, approved_by) on public.profiles to authenticated;
+grant update (avatar) on public.profiles to authenticated;
 grant select, update on public.signup_requests to authenticated;
 grant select, insert, update, delete on public.posts to authenticated;
 grant select, insert, update, delete on public.mission_targets to authenticated;
 grant select, insert, update, delete on public.comments to authenticated;
 grant select, insert, update, delete on public.reactions to authenticated;
 grant select, insert, update, delete on public.mission_events to authenticated;
+revoke execute on function public.is_admin() from public;
+revoke execute on function public.is_approved() from public;
+revoke execute on function public.delete_post(uuid) from public;
+revoke execute on function public.request_signup(text, text, text, text, text) from public;
 grant execute on function public.is_admin() to authenticated;
 grant execute on function public.is_approved() to authenticated;
 grant execute on function public.delete_post(uuid) to authenticated;
-grant execute on function public.request_signup(text, text, text, text, text) to anon, authenticated;
+grant execute on function public.request_signup(text, text, text, text, text) to anon;
+
+create index if not exists comments_parent_id_idx on public.comments(parent_id);
+create index if not exists comments_post_id_idx on public.comments(post_id);
+create index if not exists comments_user_id_idx on public.comments(user_id);
+create index if not exists mission_events_user_id_idx on public.mission_events(user_id);
+create index if not exists mission_targets_user_id_idx on public.mission_targets(user_id);
+create index if not exists posts_author_id_idx on public.posts(author_id);
+create index if not exists profiles_approved_by_idx on public.profiles(approved_by);
+create index if not exists reactions_user_id_idx on public.reactions(user_id);
+create index if not exists signup_requests_decided_by_idx on public.signup_requests(decided_by);
+create index if not exists signup_requests_user_id_idx on public.signup_requests(user_id);
 
 drop policy if exists "profiles select own or admin" on public.profiles;
 create policy "profiles select own or admin" on public.profiles
 for select to authenticated
-using (auth.uid() = id or public.is_admin() or public.is_approved());
+using ((select auth.uid()) = id or (select public.is_admin()) or (select public.is_approved()));
 
 drop policy if exists "profiles admin update" on public.profiles;
-create policy "profiles admin update" on public.profiles
-for update to authenticated
-using (public.is_admin())
-with check (public.is_admin());
 
 drop policy if exists "profiles update own avatar" on public.profiles;
 create policy "profiles update own avatar" on public.profiles
 for update to authenticated
-using (auth.uid() = id and public.is_approved())
-with check (auth.uid() = id and public.is_approved());
+using ((select auth.uid()) = id and (select public.is_approved()))
+with check ((select auth.uid()) = id and (select public.is_approved()));
 
 drop policy if exists "admins select signup requests" on public.signup_requests;
 create policy "admins select signup requests" on public.signup_requests
 for select to authenticated
-using (public.is_admin());
+using ((select public.is_admin()));
 
 drop policy if exists "admins update signup requests" on public.signup_requests;
 create policy "admins update signup requests" on public.signup_requests
 for update to authenticated
 using (public.is_admin())
-with check (public.is_admin());
+with check ((select public.is_admin()));
 
 drop policy if exists "approved select posts" on public.posts;
 create policy "approved select posts" on public.posts
 for select to authenticated
-using (public.is_approved());
+using ((select public.is_approved()));
 
 drop policy if exists "approved insert posts" on public.posts;
 create policy "approved insert posts" on public.posts
 for insert to authenticated
-with check (public.is_approved() and author_id = auth.uid() and (type <> 'notice' or public.is_admin()));
+with check ((select public.is_approved()) and author_id = (select auth.uid()) and (type <> 'notice' or (select public.is_admin())));
 
 drop policy if exists "author or admin update posts" on public.posts;
 create policy "author or admin update posts" on public.posts
 for update to authenticated
-using (author_id = auth.uid() or public.is_admin())
-with check ((author_id = auth.uid() or public.is_admin()) and (type <> 'notice' or public.is_admin()));
+using (author_id = (select auth.uid()) or (select public.is_admin()))
+with check ((author_id = (select auth.uid()) or (select public.is_admin())) and (type <> 'notice' or (select public.is_admin())));
 
 drop policy if exists "author or admin delete posts" on public.posts;
 create policy "author or admin delete posts" on public.posts
 for delete to authenticated
-using (author_id = auth.uid() or public.is_admin());
+using (author_id = (select auth.uid()) or (select public.is_admin()));
 
 drop policy if exists "approved select mission targets" on public.mission_targets;
 create policy "approved select mission targets" on public.mission_targets
 for select to authenticated
-using (public.is_approved());
+using ((select public.is_approved()));
 
 drop policy if exists "author or admin insert mission targets" on public.mission_targets;
 create policy "author or admin insert mission targets" on public.mission_targets
 for insert to authenticated
 with check (
-  public.is_admin()
-  or exists (select 1 from public.posts where id = post_id and author_id = auth.uid())
+  (select public.is_admin())
+  or exists (select 1 from public.posts where id = post_id and author_id = (select auth.uid()))
 );
 
 drop policy if exists "author or admin delete mission targets" on public.mission_targets;
 create policy "author or admin delete mission targets" on public.mission_targets
 for delete to authenticated
 using (
-  public.is_admin()
-  or exists (select 1 from public.posts where id = post_id and author_id = auth.uid())
+  (select public.is_admin())
+  or exists (select 1 from public.posts where id = post_id and author_id = (select auth.uid()))
 );
 
 drop policy if exists "approved select comments" on public.comments;
 create policy "approved select comments" on public.comments
 for select to authenticated
-using (public.is_approved());
+using ((select public.is_approved()));
 
 drop policy if exists "approved insert comments" on public.comments;
 create policy "approved insert comments" on public.comments
 for insert to authenticated
-with check (public.is_approved() and user_id = auth.uid());
+with check ((select public.is_approved()) and user_id = (select auth.uid()));
 
 drop policy if exists "own or admin delete comments" on public.comments;
 create policy "own or admin delete comments" on public.comments
 for delete to authenticated
-using (user_id = auth.uid() or public.is_admin());
+using (user_id = (select auth.uid()) or (select public.is_admin()));
 
 drop policy if exists "approved select reactions" on public.reactions;
 create policy "approved select reactions" on public.reactions
 for select to authenticated
-using (public.is_approved());
+using ((select public.is_approved()));
 
 drop policy if exists "approved insert reactions" on public.reactions;
 create policy "approved insert reactions" on public.reactions
 for insert to authenticated
-with check (public.is_approved() and user_id = auth.uid());
+with check ((select public.is_approved()) and user_id = (select auth.uid()));
 
 drop policy if exists "own or admin delete reactions" on public.reactions;
 create policy "own or admin delete reactions" on public.reactions
 for delete to authenticated
-using (user_id = auth.uid() or public.is_admin());
+using (user_id = (select auth.uid()) or (select public.is_admin()));
 
 drop policy if exists "approved select mission events" on public.mission_events;
 create policy "approved select mission events" on public.mission_events
 for select to authenticated
-using (public.is_approved());
+using ((select public.is_approved()));
 
 drop policy if exists "approved insert own mission events" on public.mission_events;
 create policy "approved insert own mission events" on public.mission_events
 for insert to authenticated
-with check (public.is_approved() and user_id = auth.uid());
+with check ((select public.is_approved()) and user_id = (select auth.uid()));
 
 -- Run after creating Auth user admin@bighub.local in Authentication > Users.
 insert into public.profiles (id, login_id, auth_email, name, department, role, status, avatar, approved_at)
