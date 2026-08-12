@@ -100,7 +100,7 @@ alter table public.comments add column if not exists parent_id uuid references p
 
 -- Legacy cleanup: older builds created pending/rejected profiles directly in Auth.
 -- New signup flow stores pending users only in signup_requests. The request-signup function
--- deletes stale pending/rejected Auth users for the same login_id before saving a new request.
+-- encrypts the password and delegates storage to public.request_signup.
 drop trigger if exists on_auth_user_created on auth.users;
 drop policy if exists "profiles insert own pending" on public.profiles;
 
@@ -152,6 +152,97 @@ begin
 end;
 $$;
 
+
+create or replace function public.request_signup(
+  login_id_input text,
+  name_input text,
+  department_input text,
+  password_ciphertext_input text,
+  password_iv_input text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  existing_request_status text;
+begin
+  login_id_input := lower(trim(login_id_input));
+  name_input := trim(name_input);
+  department_input := trim(department_input);
+
+  if login_id_input !~ '^[a-z0-9._-]{3,32}$' then
+    return jsonb_build_object('ok', false, 'status', 400, 'error', '아이디는 영문 소문자, 숫자, 점, 밑줄, 하이픈으로 3~32자 입력하세요.');
+  end if;
+
+  if name_input = '' then
+    return jsonb_build_object('ok', false, 'status', 400, 'error', '이름을 입력하세요.');
+  end if;
+
+  if department_input not in ('임원', '경영지원', '개발', '운영', '마케팅', '기타') then
+    return jsonb_build_object('ok', false, 'status', 400, 'error', '부서를 다시 선택하세요.');
+  end if;
+
+  if exists (select 1 from public.profiles where login_id = login_id_input and status = 'approved') then
+    return jsonb_build_object('ok', false, 'status', 409, 'error', '이미 가입 완료된 아이디입니다.');
+  end if;
+
+  insert into public.signup_requests (
+    login_id,
+    name,
+    department,
+    password_ciphertext,
+    password_iv,
+    status,
+    created_at,
+    decided_at,
+    decided_by,
+    user_id
+  ) values (
+    login_id_input,
+    name_input,
+    department_input,
+    password_ciphertext_input,
+    password_iv_input,
+    'pending',
+    now(),
+    null,
+    null,
+    null
+  )
+  on conflict (login_id) do update set
+    name = excluded.name,
+    department = excluded.department,
+    password_ciphertext = excluded.password_ciphertext,
+    password_iv = excluded.password_iv,
+    status = 'pending',
+    created_at = now(),
+    decided_at = null,
+    decided_by = null,
+    user_id = null
+  where public.signup_requests.status = 'rejected';
+
+  if not found then
+    select status into existing_request_status
+    from public.signup_requests
+    where login_id = login_id_input;
+
+    if existing_request_status = 'pending' then
+      return jsonb_build_object('ok', false, 'status', 409, 'error', '이미 가입 신청된 아이디입니다. 관리자 승인 후 로그인하세요.');
+    end if;
+
+    if existing_request_status = 'approved' then
+      return jsonb_build_object('ok', false, 'status', 409, 'error', '이미 가입 완료된 아이디입니다.');
+    end if;
+
+    return jsonb_build_object('ok', false, 'status', 500, 'error', '가입 신청 저장에 실패했습니다.');
+  end if;
+
+  return jsonb_build_object('ok', true);
+end;
+$fn$;
+
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.profiles to authenticated;
 revoke update on public.profiles from authenticated;
@@ -165,6 +256,7 @@ grant select, insert, update, delete on public.mission_events to authenticated;
 grant execute on function public.is_admin() to authenticated;
 grant execute on function public.is_approved() to authenticated;
 grant execute on function public.delete_post(uuid) to authenticated;
+grant execute on function public.request_signup(text, text, text, text, text) to anon, authenticated;
 
 drop policy if exists "profiles select own or admin" on public.profiles;
 create policy "profiles select own or admin" on public.profiles

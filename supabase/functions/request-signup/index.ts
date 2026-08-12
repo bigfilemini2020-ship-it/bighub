@@ -1,9 +1,8 @@
 import { corsHeaders, HttpError, json } from "../_shared/index.ts";
 
-type ExistingProfile = { id: string; status: string };
-type ExistingRequest = { id: string; status: string };
-
 const DEPARTMENTS = new Set(["임원", "경영지원", "개발", "운영", "마케팅", "기타"]);
+
+type SignupResult = { ok?: boolean; status?: number; error?: string };
 
 function env(name: string) {
   const value = Deno.env.get(name);
@@ -15,9 +14,22 @@ function baseUrl() {
   return env("SUPABASE_URL").replace(/\/$/, "");
 }
 
-function serviceHeaders() {
-  const key = env("SUPABASE_SERVICE_ROLE_KEY");
-  return { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" };
+function defaultSecret(name: string, legacyName: string) {
+  const raw = Deno.env.get(name);
+  if (raw) {
+    const value = JSON.parse(raw).default;
+    if (value) return value;
+  }
+  const legacy = Deno.env.get(legacyName);
+  if (legacy) return legacy;
+  throw new HttpError(500, "환경 변수 " + name + ".default" + "가 없습니다.");
+}
+
+function publicHeaders() {
+  const key = defaultSecret("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY");
+  const headers: Record<string, string> = { apikey: key, "Content-Type": "application/json" };
+  if (!key.startsWith("sb_publishable_")) headers.Authorization = "Bearer " + key;
+  return headers;
 }
 
 function validLoginId(value: unknown) {
@@ -44,25 +56,27 @@ async function encryptPassword(password: string) {
   return { password_ciphertext: b64(encrypted), password_iv: b64(iv) };
 }
 
-async function selectOne<T>(path: string): Promise<T | null> {
-  const response = await fetch(baseUrl() + path, { headers: serviceHeaders() });
-  const rows = await response.json().catch(() => []);
-  if (!response.ok) throw new HttpError(500, "가입 신청 정보를 확인하지 못했습니다.");
-  return Array.isArray(rows) ? rows[0] ?? null : null;
-}
-
-async function deleteStaleAuthUser(id: string) {
-  const response = await fetch(baseUrl() + "/auth/v1/admin/users/" + encodeURIComponent(id), { method: "DELETE", headers: serviceHeaders() });
-  if (!response.ok && response.status !== 404) throw new HttpError(500, "이전 가입 신청 정보를 정리하지 못했습니다.");
-}
-
-async function upsertRequest(row: Record<string, unknown>) {
-  const response = await fetch(baseUrl() + "/rest/v1/signup_requests?on_conflict=login_id", {
+async function saveSignup(input: {
+  login_id: string;
+  name: string;
+  department: string;
+  password_ciphertext: string;
+  password_iv: string;
+}) {
+  const response = await fetch(baseUrl() + "/rest/v1/rpc/request_signup", {
     method: "POST",
-    headers: { ...serviceHeaders(), Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify(row),
+    headers: publicHeaders(),
+    body: JSON.stringify({
+      login_id_input: input.login_id,
+      name_input: input.name,
+      department_input: input.department,
+      password_ciphertext_input: input.password_ciphertext,
+      password_iv_input: input.password_iv,
+    }),
   });
+  const result = await response.json().catch(() => ({})) as SignupResult;
   if (!response.ok) throw new HttpError(500, "가입 신청 저장에 실패했습니다.");
+  if (!result.ok) throw new HttpError(result.status || 500, result.error || "가입 신청 저장에 실패했습니다.");
 }
 
 Deno.serve(async (req) => {
@@ -79,25 +93,7 @@ Deno.serve(async (req) => {
     if (!DEPARTMENTS.has(department)) throw new HttpError(400, "부서를 다시 선택하세요.");
     if (password.length < 6) throw new HttpError(400, "비밀번호는 6자 이상 입력하세요.");
 
-    const existingProfile = await selectOne<ExistingProfile>("/rest/v1/profiles?login_id=eq." + encodeURIComponent(login_id) + "&select=id,status");
-    if (existingProfile?.status === "approved") throw new HttpError(409, "이미 가입 완료된 아이디입니다.");
-    if (existingProfile?.id) await deleteStaleAuthUser(existingProfile.id);
-
-    const existing = await selectOne<ExistingRequest>("/rest/v1/signup_requests?login_id=eq." + encodeURIComponent(login_id) + "&select=id,status");
-    if (existing?.status === "pending") throw new HttpError(409, "이미 가입 신청된 아이디입니다. 관리자 승인 후 로그인하세요.");
-    if (existing?.status === "approved") throw new HttpError(409, "이미 가입 완료된 아이디입니다.");
-
-    await upsertRequest({
-      login_id,
-      name,
-      department,
-      status: "pending",
-      ...(await encryptPassword(password)),
-      created_at: new Date().toISOString(),
-      decided_at: null,
-      decided_by: null,
-      user_id: null,
-    });
+    await saveSignup({ login_id, name, department, ...(await encryptPassword(password)) });
     return json({ ok: true });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "가입 신청에 실패했습니다." }, error instanceof HttpError ? error.status : 500);

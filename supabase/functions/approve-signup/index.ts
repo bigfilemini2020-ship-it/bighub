@@ -10,13 +10,26 @@ function baseUrl() {
   return env("SUPABASE_URL").replace(/\/$/, "");
 }
 
+function defaultSecret(name: string, legacyName: string) {
+  const raw = Deno.env.get(name);
+  if (raw) {
+    const value = JSON.parse(raw).default;
+    if (value) return value;
+  }
+  const legacy = Deno.env.get(legacyName);
+  if (legacy) return legacy;
+  throw new HttpError(500, "환경 변수 " + name + ".default가 없습니다.");
+}
+
 function serviceHeaders() {
-  const key = env("SUPABASE_SERVICE_ROLE_KEY");
-  return { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" };
+  const key = defaultSecret("SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY");
+  const headers: Record<string, string> = { apikey: key, "Content-Type": "application/json" };
+  if (!key.startsWith("sb_secret_")) headers.Authorization = "Bearer " + key;
+  return headers;
 }
 
 function anonHeaders(token: string) {
-  return { apikey: env("SUPABASE_ANON_KEY"), Authorization: "Bearer " + token };
+  return { apikey: defaultSecret("SUPABASE_PUBLISHABLE_KEYS", "SUPABASE_ANON_KEY"), Authorization: "Bearer " + token };
 }
 
 async function currentAdmin(req: Request) {

@@ -49,6 +49,8 @@ test("signup request schema uses temporary requests", () => {
   assert.match(schema, /create table if not exists public.signup_requests/);
   assert.match(schema, /password_ciphertext text/);
   assert.match(schema, /create policy "admins select signup requests"/);
+  assert.match(schema, /create or replace function public.request_signup/);
+  assert.match(schema, /grant execute on function public.request_signup/);
   assert.match(schema, /drop trigger if exists on_auth_user_created on auth.users/);
   assert.doesNotMatch(schema, /create trigger on_auth_user_created/);
   assert.doesNotMatch(schema, /create policy "profiles insert own pending"/);
@@ -59,9 +61,13 @@ test("signup edge functions are wired to request table and admin auth", () => {
   const requestSignup = fs.readFileSync(path.join(__dirname, "supabase/functions/request-signup/index.ts"), "utf8");
   const approveSignup = fs.readFileSync(path.join(__dirname, "supabase/functions/approve-signup/index.ts"), "utf8");
   const rejectSignup = fs.readFileSync(path.join(__dirname, "supabase/functions/reject-signup/index.ts"), "utf8");
-  assert.ok(requestSignup.includes("signup_requests?on_conflict=login_id"));
+  assert.ok(requestSignup.includes("/rest/v1/rpc/request_signup"));
   assert.match(requestSignup, /BIGHUB_SIGNUP_SECRET/);
-  assert.match(requestSignup, /auth\/v1\/admin\/users\//);
+  assert.match(requestSignup, /function defaultSecret/);
+  assert.match(requestSignup, /SUPABASE_PUBLISHABLE_KEYS/);
+  assert.doesNotMatch(requestSignup, /SUPABASE_SECRET_KEYS/);
+  assert.match(approveSignup, /SUPABASE_PUBLISHABLE_KEYS/);
+  assert.match(approveSignup, /sb_secret_/);
   assert.match(approveSignup, /auth\/v1\/admin\/users/);
   assert.match(approveSignup, /password_ciphertext: null/);
   assert.match(rejectSignup, /status: "rejected"/);
