@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-signup-flow-1";
+const webAppVersion = "2026.08.12-comments-refresh-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -607,7 +607,7 @@ function bindNavigation() {
       event.currentTarget.value = "";
     }
   });
-  byId("resetDemo").addEventListener("click", async () => { const button = byId("resetDemo"); if (button) { button.disabled = true; button.classList.add("is-busy"); } try { if (remoteAuth()) await refreshRemoteData(); else state = loadState(); render(); } catch (error) { alert(error.message || "새로고침에 실패했습니다."); } finally { if (button) { button.disabled = false; button.classList.remove("is-busy"); } } });
+  byId("resetDemo").addEventListener("click", async () => { const button = byId("resetDemo"); if (button) { button.disabled = true; button.classList.add("is-busy"); } const minimumSpin = wait(600); try { if (remoteAuth()) await refreshRemoteData(); else state = loadState(); render(); } catch (error) { alert(error.message || "새로고침에 실패했습니다."); } finally { await minimumSpin; if (button) { button.disabled = false; button.classList.remove("is-busy"); } } });
 }
 
 function bindDesktopSettings() {

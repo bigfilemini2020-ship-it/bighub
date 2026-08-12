@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
+const crypto = require("node:crypto");
 
 const bundleSets = [
   ["app-session.js", "app-drive.js", "app-compose.js", "app.js"],
@@ -121,6 +122,29 @@ test("signup schema has one canonical lifecycle definition", () => {
   assert.equal(count(/create or replace function public\.reject_signup_request\(/g), 1);
   assert.equal(count(/create policy "admins select signup requests"/g), 1);
   assert.doesNotMatch(schema, /approved_at = coalesce\(public\.profiles\.approved_at, now\(\)\);\r?\n\s+then/);
+});
+
+// The token-match test below only proves the ?v= values agree with each other.
+// Editing styles.css without changing webAppVersion keeps them agreeing while
+// WebView2 serves the cached old file -- the refresh spinner shipped invisible
+// that way. Pinning a hash of the assets to the version forces the bump.
+//
+// When this fails: bump webAppVersion in app.js, the ?v= tokens in index.html
+// (both copies), then paste the reported sha256 into asset-fingerprint.json.
+test("asset fingerprint matches webAppVersion and the desktop mirror", () => {
+  const fingerprint = JSON.parse(fs.readFileSync(path.join(__dirname, "asset-fingerprint.json"), "utf8"));
+  const version = fs.readFileSync(path.join(__dirname, "app.js"), "utf8").match(/const webAppVersion = "([^"]+)"/)?.[1];
+  assert.equal(fingerprint.webAppVersion, version, "asset-fingerprint.json is stale: webAppVersion moved");
+
+  const hash = crypto.createHash("sha256");
+  for (const asset of fingerprint.assets) {
+    const root = fs.readFileSync(path.join(__dirname, asset));
+    const mirror = fs.readFileSync(path.join(__dirname, "desktop-dist", asset));
+    assert.ok(root.equals(mirror), `desktop-dist/${asset} differs from the root copy`);
+    hash.update(asset);
+    hash.update(root);
+  }
+  assert.equal(hash.digest("hex"), fingerprint.sha256, "assets changed without a webAppVersion bump");
 });
 
 // ponytail: 캐시버스터를 손으로 맞춘다. 자산이 늘거나 배포가 잦아지면 index.html 생성 스텝으로 올려라.
