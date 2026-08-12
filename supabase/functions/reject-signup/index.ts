@@ -23,9 +23,7 @@ function defaultSecret(name: string, legacyName: string) {
 
 function serviceHeaders() {
   const key = defaultSecret("SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY");
-  const headers: Record<string, string> = { apikey: key, "Content-Type": "application/json" };
-  if (!key.startsWith("sb_secret_")) headers.Authorization = "Bearer " + key;
-  return headers;
+  return { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json" };
 }
 
 function anonHeaders(token: string) {

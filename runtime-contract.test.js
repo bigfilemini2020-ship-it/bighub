@@ -67,7 +67,7 @@ test("signup edge functions are wired to request table and admin auth", () => {
   assert.match(requestSignup, /SUPABASE_PUBLISHABLE_KEYS/);
   assert.doesNotMatch(requestSignup, /SUPABASE_SECRET_KEYS/);
   assert.match(approveSignup, /SUPABASE_PUBLISHABLE_KEYS/);
-  assert.match(approveSignup, /sb_secret_/);
+  assert.match(approveSignup, /Authorization: "Bearer " \+ key/);
   assert.match(approveSignup, /auth\/v1\/admin\/users/);
   assert.match(approveSignup, /password_ciphertext: null/);
   assert.match(rejectSignup, /method: "DELETE"/);
@@ -79,3 +79,12 @@ test("signup edge functions are wired to request table and admin auth", () => {
 });
 
 
+
+
+test("admin signup edge functions send bearer auth for secret keys", () => {
+  for (const file of ["supabase/functions/approve-signup/index.ts", "supabase/functions/reject-signup/index.ts"]) {
+    const source = fs.readFileSync(path.join(__dirname, file), "utf8");
+    assert.match(source, /Authorization: "Bearer " \+ key/);
+    assert.doesNotMatch(source, /if (!key.startsWith("sb_secret_")) headers.Authorization/);
+  }
+});
