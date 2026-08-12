@@ -13,3 +13,8 @@ work/*.key.pub
 .codegraph/
 latest.json
 supabase/.temp/
+
+# Internal working notes: production DB structure, RLS policies and findings.
+# The GitHub repo is public; these stay local.
+docs/STRUCTURE.md
+CLAUDE_HANDOFF.md
