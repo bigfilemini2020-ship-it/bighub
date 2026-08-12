@@ -15,20 +15,20 @@ export function json(value: unknown, status = 200) {
 
 function requiredEnv(name: string) {
   const value = Deno.env.get(name);
-  if (!value) throw new HttpError(500, "\ud658\uacbd \ubcc0\uc218 " + name + "\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.");
+  if (!value) throw new HttpError(500, "\uD658\uACBD \uBCC0\uC218 " + name + "\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.");
   return value;
 }
 
 export async function requireApprovedUser(req: Request) {
   const token = String(req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!token) throw new HttpError(401, "???? ?????.");
+  if (!token) throw new HttpError(401, "\uB85C\uADF8\uC778\uC774 \uD544\uC694\uD569\uB2C8\uB2E4.");
 
   const supabaseUrl = requiredEnv("SUPABASE_URL");
   const anonKey = requiredEnv("SUPABASE_ANON_KEY");
   const authResponse = await fetch(supabaseUrl + "/auth/v1/user", {
     headers: { Authorization: "Bearer " + token, apikey: anonKey },
   });
-  if (!authResponse.ok) throw new HttpError(401, "??? ??? ??? ? ????. ?? ??????.");
+  if (!authResponse.ok) throw new HttpError(401, "\uC0AC\uC6A9\uC790 \uC815\uBCF4\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uB85C\uADF8\uC778\uD558\uC138\uC694.");
 
   const user = await authResponse.json();
   const profileResponse = await fetch(
@@ -41,9 +41,9 @@ export async function requireApprovedUser(req: Request) {
     },
   );
   const profiles = await profileResponse.json().catch(() => []);
-  if (!profileResponse.ok) throw new HttpError(500, "??? ?? ??? ??? ? ????.");
+  if (!profileResponse.ok) throw new HttpError(500, "\uC2B9\uC778 \uC815\uBCF4\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
   if (!Array.isArray(profiles) || profiles[0]?.status !== "approved") {
-    throw new HttpError(403, "??? ???? ??? ? ? ????.");
+    throw new HttpError(403, "\uC2B9\uC778\uB41C \uC0AC\uC6A9\uC790\uB9CC \uC0AC\uC6A9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
   }
 
   return user;
@@ -54,13 +54,13 @@ export async function googleAccessToken() {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || !payload.access_token) {
     const detail = typeof payload.error_description === "string" ? payload.error_description : typeof payload.error === "string" ? payload.error : "access token was not issued.";
-    throw new HttpError(502, `Google Drive \uc778\uc99d \uc815\ubcf4\ub97c \uac00\uc838\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4: ${detail}`);
+    throw new HttpError(502, "Google Drive \uC778\uC99D \uC815\uBCF4\uB97C \uAC00\uC838\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4: " + detail);
   }
   return payload.access_token as string;
 }
 
 export function requiredGoogleFolderId() { return requiredEnv("GOOGLE_DRIVE_FOLDER_ID"); }
-export function safeFileName(value: string) { return String(value || "\ucca8\ubd80\ud30c\uc77c").replace(/[\\/\0]/g, "_").slice(0, 180) || "\ucca8\ubd80\ud30c\uc77c"; }
+export function safeFileName(value: string) { return String(value || "\uCCA8\uBD80\uD30C\uC77C").replace(/[\\/\0]/g, "_").slice(0, 180) || "\uCCA8\uBD80\uD30C\uC77C"; }
 export function contentDisposition(type: string, name: string) {
   const safe = safeFileName(name);
   const ascii = safe.replace(/[^\x20-\x7E]/g, "_");

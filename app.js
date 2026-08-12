@@ -441,7 +441,7 @@ function bindAuthForms() {
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
       const user = remoteAuth() ? await window.BigHubSupabase.signIn(data) : S.authenticateUser(state, data);
-      if (!user) { byId("loginMessage").textContent = "승인된 계정이 없거나 비밀번호가 맞지 않습니다."; return; }
+      if (!user) { byId("loginMessage").textContent = "\uC2B9\uC778\uB41C \uACC4\uC815\uC774 \uC5C6\uAC70\uB098 \uBE44\uBC00\uBC88\uD638\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."; return; }
       currentUserId = user.id;
       if (remoteAuth()) mergeRemoteUser(user);
       const rememberId = byId("rememberId").checked || byId("autoLogin").checked;
@@ -452,9 +452,9 @@ function bindAuthForms() {
       shouldRestoreFeedPosition = true;
       applySavedFeedFilter();
       render();
-      if (syncError) alert(`로그인은 됐지만 게시글 동기화에 실패했습니다. Supabase SQL 업데이트가 필요합니다.\n\n${syncError}`);
+      if (syncError) alert("\uB85C\uADF8\uC778\uC740 \uB410\uC9C0\uB9CC \uAC8C\uC2DC\uAE00 \uB3D9\uAE30\uD654\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. Supabase SQL \uC5C5\uB370\uC774\uD2B8\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.\n\n" + syncError);
     } catch (error) {
-      byId("loginMessage").textContent = error.message || "로그인에 실패했습니다.";
+      byId("loginMessage").textContent = error.message || "\uB85C\uADF8\uC778\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.";
     }
   });
   byId("signupForm").addEventListener("submit", async (event) => {
@@ -471,19 +471,19 @@ function bindAuthForms() {
       if (typeof signupForm.reset === "function") signupForm.reset();
       if (remoteAuth()) await refreshRemoteData();
       setAuthMode("login");
-      byId("loginMessage").textContent = "가입 신청이 접수됐습니다. 승인 후 로그인하세요.";
-      alert("가입 신청이 접수됐습니다. 관리자 승인 후 로그인할 수 있습니다.");
+      byId("loginMessage").textContent = "\uAC00\uC785 \uC2E0\uCCAD\uC774 \uC811\uC218\uB410\uC2B5\uB2C8\uB2E4. \uAD00\uB9AC\uC790 \uC2B9\uC778 \uD6C4 \uB85C\uADF8\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.";
+      alert("\uAC00\uC785 \uC2E0\uCCAD\uC774 \uC811\uC218\uB410\uC2B5\uB2C8\uB2E4. \uAD00\uB9AC\uC790 \uC2B9\uC778 \uD6C4 \uB85C\uADF8\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.");
       render();
     } catch (error) {
-      const message = error.message || "가입 신청에 실패했습니다.";
-      if (message.includes("이미 가입 신청된 아이디")) {
+      const message = error.message || "\uAC00\uC785 \uC2E0\uCCAD\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.";
+      if (message.includes("\uC774\uBBF8 \uAC00\uC785") || message.includes("\uAC00\uC785 \uC2E0\uCCAD\uB41C") || message.includes("\uAD00\uB9AC\uC790 \uC2B9\uC778") || message.includes("\uC2B9\uC778 \uD6C4 \uB85C\uADF8\uC778")) {
+        alert(message);
         setAuthMode("login");
         byId("loginMessage").textContent = message;
-        alert(message);
         return;
       }
       byId("signupMessage").textContent = message;
-      alert(`가입 신청 실패: ${message}`);
+      alert("\uAC00\uC785 \uC2E0\uCCAD \uC2E4\uD328: " + message);
     }
   });
 }
@@ -1157,7 +1157,7 @@ document.addEventListener("click", async (event) => {
   if (target.dataset.action === "approve-signup") {
     if (remoteAuth()) {
       try { await window.BigHubSupabase.approveProfile(target.dataset.requestId); await refreshRemoteData(); render(); }
-      catch (error) { alert(error.message || "?? ?? ??? ??????."); }
+      catch (error) { alert(error.message || "\uAC00\uC785 \uC2B9\uC778 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."); }
       return;
     }
     state = S.approveSignupRequest(state, target.dataset.requestId);
@@ -1165,7 +1165,7 @@ document.addEventListener("click", async (event) => {
   if (target.dataset.action === "reject-signup") {
     if (remoteAuth()) {
       try { await window.BigHubSupabase.rejectProfile(target.dataset.requestId); await refreshRemoteData(); render(); }
-      catch (error) { alert(error.message || "?? ?? ??? ??????."); }
+      catch (error) { alert(error.message || "\uAC00\uC785 \uAC70\uC808 \uCC98\uB9AC\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4."); }
       return;
     }
     state = S.rejectSignupRequest(state, target.dataset.requestId);

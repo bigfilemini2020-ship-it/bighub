@@ -162,7 +162,11 @@ test("signup submit keeps form reference and guides duplicate requests", () => {
     assert.ok(app.includes("new FormData(signupForm)"));
     assert.ok(app.includes("signupForm.reset()"));
     assert.ok(!app.includes("event.currentTarget.reset"));
-    assert.ok(app.includes('message.includes("'));
+    assert.ok(app.includes('message.includes("\\uC774\\uBBF8 \\uAC00\\uC785")'));
+    assert.ok(app.includes('message.includes("\\uAC00\\uC785 \\uC2E0\\uCCAD\\uB41C")'));
+    assert.ok(app.includes('message.includes("\\uAD00\\uB9AC\\uC790 \\uC2B9\\uC778")'));
+    assert.ok(app.includes('message.includes("\\uC2B9\\uC778 \\uD6C4 \\uB85C\\uADF8\\uC778")'));
+    assert.ok(app.includes("alert(message);"));
     assert.ok(app.includes('byId("loginMessage").textContent = message'));
     assert.ok(app.includes('setAuthMode("login")'));
   }
@@ -177,6 +181,7 @@ test("signup approval buttons surface remote failures", () => {
     assert.ok(app.includes('await window.BigHubSupabase.approveProfile'));
     assert.ok(app.includes('await window.BigHubSupabase.rejectProfile'));
     assert.ok(app.includes('catch (error)'));
-    assert.ok(app.includes('?? ?? ??? ??????.'));
+    assert.ok(app.includes('\\uAC00\\uC785 \\uC2B9\\uC778 \\uCC98\\uB9AC\\uC5D0 \\uC2E4\\uD328\\uD588\\uC2B5\\uB2C8\\uB2E4.'));
+    assert.ok(app.includes('\\uAC00\\uC785 \\uAC70\\uC808 \\uCC98\\uB9AC\\uC5D0 \\uC2E4\\uD328\\uD588\\uC2B5\\uB2C8\\uB2E4.'));
   }
 });
