@@ -2499,3 +2499,91 @@ textarea {
     opacity: 0.6;
   }
 }
+
+/* Comments open over the side panel instead of inside the card, which pushed
+   the post itself off screen. Same grid cell as .side-panel, one z-layer up;
+   the negative margin borrows the 64px column gap so comments get real width. */
+.comments-drawer {
+  grid-column: 2;
+  grid-row: 1;
+  z-index: 6;
+  position: sticky;
+  top: 24px;
+  height: calc(100vh - 48px);
+  margin-left: -56px;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.comments-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.comments-drawer-head strong {
+  font-size: 15px;
+}
+
+.comments-drawer-post {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--soft);
+}
+
+.comments-drawer-post strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.comments-drawer-post span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.comments-drawer-body {
+  overflow-y: auto;
+  padding: 0 16px 16px;
+}
+
+.comments-drawer-body .comment-list {
+  margin-top: 0;
+  border-top: 0;
+}
+
+.comments-drawer-empty {
+  margin: 24px 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.comments-drawer-form {
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+
+/* Narrow windows drop the side panel, so the drawer covers the feed instead. */
+@media (max-width: 1080px) {
+  .comments-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    height: 100%;
+    margin-left: 0;
+    border-radius: 0;
+  }
+}

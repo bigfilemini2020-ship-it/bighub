@@ -244,7 +244,8 @@ test("renderSearch is present because render calls it", () => {
   for (const bundle of bundles) {
     const source = fs.readFileSync(path.join(__dirname, bundle), "utf8");
     assert.match(source, /function renderSearch\(\)/);
-    assert.match(source, /renderCurrentUser\(\); renderFeed\(\); renderSearch\(\);/);
+    // Order matters (user, then feed, then search); what sits between them does not.
+    assert.match(source, /renderCurrentUser\(\); renderFeed\(\);[^\n]*renderSearch\(\);/);
   }
 });
 

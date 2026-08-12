@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-comments-refresh-1";
+const webAppVersion = "2026.08.12-comments-drawer-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -872,7 +872,7 @@ function render() {
   document.querySelectorAll(".rail-button[data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === activeView));
   document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
   byId(`${activeView}View`).classList.add("active");
-  renderCurrentUser(); renderFeed(); renderSearch(); renderProgress(); renderStats(); renderApprovals(); renderCalendar(); renderDesktopSettings(); restoreFeedPosition();
+  renderCurrentUser(); renderFeed(); renderCommentsDrawer(); renderSearch(); renderProgress(); renderStats(); renderApprovals(); renderCalendar(); renderDesktopSettings(); restoreFeedPosition();
 }
 
 function renderMissionTargets() {
@@ -933,6 +933,28 @@ function sortFeedPosts(posts) {
   });
 }
 
+// Comments open in a drawer over the side panel rather than inside the card:
+// inline they pushed the post up and off screen. One post at a time, so
+// openCommentPostIds holds at most one id.
+function renderCommentsDrawer() {
+  const drawer = byId("commentsDrawer");
+  if (!drawer) return;
+  const postId = [...openCommentPostIds][0] || "";
+  const post = postId ? state.posts.find((item) => item.id === postId) : null;
+  if (!post) {
+    openCommentPostIds.clear();
+    drawer.classList.add("hidden");
+    drawer.innerHTML = "";
+    return;
+  }
+  const comments = state.comments.filter((comment) => comment.postId === post.id);
+  const list = comments.length
+    ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>`
+    : `<p class="comments-drawer-empty">첫 댓글을 남겨보세요.</p>`;
+  drawer.classList.remove("hidden");
+  drawer.innerHTML = `<header class="comments-drawer-head"><strong>댓글 ${comments.length}</strong><button class="modal-close" data-action="close-comments" type="button" aria-label="닫기">×</button></header><div class="comments-drawer-post">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(post.title)}</strong><span>${escapeHtml(userName(post.authorId))} · ${postTypeLabel(post.type)}</span></div></div><div class="comments-drawer-body">${list}</div><form class="inline-form comments-drawer-form" data-action="comment" data-post-id="${escapeHtml(post.id)}"><input id="comment-${escapeHtml(post.id)}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form>`;
+}
+
 function canManageComment(comment) {
   const item = currentUser();
   return Boolean(item) && (item.role === "admin" || comment.userId === item.id);
@@ -986,12 +1008,11 @@ function postCardHtml(post) {
   const commentAction = `<button class="icon-action comment${commentsOpen ? " active" : ""}" data-action="toggle-comments" data-post-id="${escapeHtml(post.id)}" type="button" title="댓글" aria-label="댓글">${iconSvg("comment")}<span>댓글 ${comments.length}</span></button>`;
   const completionAvatars = completionEnabled ? completionAvatarStack(completion.completedUserIds) : "";
   const actions = `<div class="feed-actions">${commentAction}${doneAction}${completionAvatars}${saveControlHtml(post)}</div>`;
-  const commentsPanel = commentsOpen ? `<div class="comments-panel">${comments.length ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>` : ""}<form class="inline-form" data-action="comment" data-post-id="${post.id}"><input id="comment-${post.id}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form></div>` : "";
   const header = `<header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${menuButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>`;
   if (collapsed) {
-    return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}">${header}<section class="feed-body collapsed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">확인한 글입니다.</p><button class="expand-post-button" data-action="expand-post" data-post-id="${escapeHtml(post.id)}" type="button">더보기</button>${actions}${commentsPanel}</section></article>`;
+    return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}">${header}<section class="feed-body collapsed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">확인한 글입니다.</p><button class="expand-post-button" data-action="expand-post" data-post-id="${escapeHtml(post.id)}" type="button">더보기</button>${actions}</section></article>`;
   }
-  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}">${header}${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}${actions}${commentsPanel}</section></article>`;
+  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}">${header}${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}${actions}</section></article>`;
 }
 function miniAvatarHtml(userId) {
   return avatarMarkup(user(userId), "completion-avatar");
@@ -1130,7 +1151,7 @@ function formatDate(value) { const date = new Date(value); return Number.isNaN(d
 
 document.addEventListener("click", async (event) => {
   const focusTarget = event.target.closest("[data-focus-comment]");
-  if (focusTarget) { openCommentPostIds.add(focusTarget.dataset.focusComment); renderFeed(); const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
+  if (focusTarget) { openCommentPostIds.clear(); openCommentPostIds.add(focusTarget.dataset.focusComment); render(); const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
   const replyTarget = event.target.closest("[data-focus-reply]");
   if (replyTarget) { const form = replyTarget.closest(".comment")?.querySelector(".reply-form"); if (form) { form.classList.toggle("hidden"); form.querySelector("input")?.focus(); } return; }
   const target = event.target.closest("[data-action]");
@@ -1187,10 +1208,16 @@ document.addEventListener("click", async (event) => {
     renderFeed();
     return;
   }
+  if (target.dataset.action === "close-comments") {
+    openCommentPostIds.clear();
+    render();
+    return;
+  }
   if (target.dataset.action === "toggle-comments") {
     const postId = target.dataset.postId;
-    if (openCommentPostIds.has(postId)) openCommentPostIds.delete(postId);
-    else openCommentPostIds.add(postId);
+    const wasOpen = openCommentPostIds.has(postId);
+    openCommentPostIds.clear();
+    if (!wasOpen) openCommentPostIds.add(postId);
     renderFeed();
     return;
   }

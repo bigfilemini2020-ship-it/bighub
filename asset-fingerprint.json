@@ -1,5 +1,5 @@
 {
-  "webAppVersion": "2026.08.12-comments-refresh-1",
+  "webAppVersion": "2026.08.12-comments-drawer-1",
   "assets": [
     "styles.css",
     "supabase-config.js",
@@ -10,5 +10,5 @@
     "app-compose.js",
     "app.js"
   ],
-  "sha256": "5d2f64c4ef14f33e1f514d8ae0f9c26c5ceb733d5913fe678a2bd971175020a1"
+  "sha256": "ad0caf7496c0b4e0bbe039a2f18f4d4c85ea9c832fa19b89900b164384e99c09"
 }
