@@ -607,7 +607,7 @@ function bindNavigation() {
       event.currentTarget.value = "";
     }
   });
-  byId("resetDemo").addEventListener("click", async () => { const button = byId("resetDemo"); if (button) button.disabled = true; try { if (remoteAuth()) await refreshRemoteData(); else state = loadState(); render(); } catch (error) { alert(error.message || "새로고침에 실패했습니다."); } finally { if (button) button.disabled = false; } });
+  byId("resetDemo").addEventListener("click", async () => { const button = byId("resetDemo"); if (button) { button.disabled = true; button.classList.add("is-busy"); } try { if (remoteAuth()) await refreshRemoteData(); else state = loadState(); render(); } catch (error) { alert(error.message || "새로고침에 실패했습니다."); } finally { if (button) { button.disabled = false; button.classList.remove("is-busy"); } } });
 }
 
 function bindDesktopSettings() {
@@ -931,6 +931,38 @@ function sortFeedPosts(posts) {
     if (aIntro !== bIntro) return aIntro ? 1 : -1;
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
+}
+
+function canManageComment(comment) {
+  const item = currentUser();
+  return Boolean(item) && (item.role === "admin" || comment.userId === item.id);
+}
+
+// Markup contract: the reply toggle finds its form via
+// closest(".comment").querySelector(".reply-form"), so the form must sit inside
+// the comment it belongs to, and replies must not carry one of their own.
+function commentHtml(postId, comment, replies, isReply) {
+  const reply = isReply
+    ? ""
+    : `<button type="button" data-focus-reply>답글</button>`;
+  const remove = canManageComment(comment)
+    ? `<button type="button" data-action="delete-comment" data-comment-id="${escapeHtml(comment.id)}">삭제</button>`
+    : "";
+  const tools = reply || remove ? `<div class="comment-tools">${reply}${remove}</div>` : "";
+  const replyForm = isReply
+    ? ""
+    : `<form class="inline-form reply-form hidden" data-action="comment" data-post-id="${escapeHtml(postId)}" data-parent-id="${escapeHtml(comment.id)}"><input name="body" placeholder="답글을 입력하세요." required /><button type="submit">게시</button></form>`;
+  const replyList = replies.length
+    ? `<div class="reply-list">${replies.map((item) => commentHtml(postId, item, [], true)).join("")}</div>`
+    : "";
+  return `<div class="comment${isReply ? " reply" : ""}">${avatarMarkup(user(comment.userId), "comment-avatar")}<div class="comment-content"><p><strong>${escapeHtml(userName(comment.userId))}</strong>${escapeHtml(comment.body)}</p>${tools}${replyForm}${replyList}</div></div>`;
+}
+
+function commentsHtml(postId, comments) {
+  return comments
+    .filter((comment) => !comment.parentId)
+    .map((comment) => commentHtml(postId, comment, comments.filter((item) => item.parentId === comment.id), false))
+    .join("");
 }
 
 function postCardHtml(post) {

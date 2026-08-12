@@ -2463,3 +2463,25 @@ textarea {
 .approval-actions .mini-button { min-width: 58px; }
 .mini-button.secondary { background: #ffffff; color: #111827; border-color: #d8dee8; }
 .mini-button.secondary:hover { background: #f3f6fb; }
+
+/* Refresh feedback: the button only went disabled, which is invisible on a
+   transparent rail button, so a click looked like nothing happened. */
+@keyframes bighub-spin {
+  to { transform: rotate(360deg); }
+}
+
+.rail-button.is-busy span {
+  display: inline-block;
+  animation: bighub-spin 0.8s linear infinite;
+}
+
+.rail-button.is-busy strong {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-button.is-busy span {
+    animation: none;
+    opacity: 0.6;
+  }
+}

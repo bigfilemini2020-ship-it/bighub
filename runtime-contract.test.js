@@ -22,6 +22,20 @@ test("render pipeline only calls render helpers that exist in loaded bundles", (
   }
 });
 
+// The render-helper check above only covers render*-named functions, so a
+// missing commentsHtml() slipped through: opening a comment panel on a post
+// that had comments threw ReferenceError and the card fell back to
+// "게시글을 표시하는 중 문제가 발생했습니다." Same shape, whole *Html convention.
+test("every *Html helper called in the bundles is defined in them", () => {
+  for (const files of bundleSets) {
+    const source = joinedSource(files);
+    const called = new Set(Array.from(source.matchAll(/\b([a-z][A-Za-z0-9_]*Html)\s*\(/g)).map((match) => match[1]));
+    const defined = new Set(Array.from(source.matchAll(/function\s+([a-z][A-Za-z0-9_]*Html)\s*\(/g)).map((match) => match[1]));
+    const missing = [...called].filter((name) => !defined.has(name)).sort();
+    assert.deepEqual(missing, [], `${files.join(", ")} missing ${missing.join(", ")}`);
+  }
+});
+
 test("main bundles do not contain known undefined-function regressions", () => {
   for (const files of bundleSets) {
     const source = joinedSource(files);
