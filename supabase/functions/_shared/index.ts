@@ -21,14 +21,14 @@ function requiredEnv(name: string) {
 
 export async function requireApprovedUser(req: Request) {
   const token = String(req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!token) throw new HttpError(401, "로그인이 필요합니다.");
+  if (!token) throw new HttpError(401, "???? ?????.");
 
   const supabaseUrl = requiredEnv("SUPABASE_URL");
   const anonKey = requiredEnv("SUPABASE_ANON_KEY");
   const authResponse = await fetch(supabaseUrl + "/auth/v1/user", {
     headers: { Authorization: "Bearer " + token, apikey: anonKey },
   });
-  if (!authResponse.ok) throw new HttpError(401, "로그인 정보를 확인할 수 없습니다. 다시 로그인하세요.");
+  if (!authResponse.ok) throw new HttpError(401, "??? ??? ??? ? ????. ?? ??????.");
 
   const user = await authResponse.json();
   const profileResponse = await fetch(
@@ -41,9 +41,9 @@ export async function requireApprovedUser(req: Request) {
     },
   );
   const profiles = await profileResponse.json().catch(() => []);
-  if (!profileResponse.ok) throw new HttpError(500, "사용자 승인 정보를 확인할 수 없습니다.");
+  if (!profileResponse.ok) throw new HttpError(500, "??? ?? ??? ??? ? ????.");
   if (!Array.isArray(profiles) || profiles[0]?.status !== "approved") {
-    throw new HttpError(403, "승인된 사용자만 파일을 열 수 있습니다.");
+    throw new HttpError(403, "??? ???? ??? ? ? ????.");
   }
 
   return user;

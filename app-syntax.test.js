@@ -168,3 +168,15 @@ test("signup submit keeps form reference and guides duplicate requests", () => {
   }
 });
 
+
+test("signup approval buttons surface remote failures", () => {
+  for (const file of ["app.js", "desktop-dist/app.js"]) {
+    const app = require("node:fs").readFileSync(file, "utf8");
+    assert.ok(app.includes('target.dataset.action === "approve-signup"'));
+    assert.ok(app.includes('target.dataset.action === "reject-signup"'));
+    assert.ok(app.includes('await window.BigHubSupabase.approveProfile'));
+    assert.ok(app.includes('await window.BigHubSupabase.rejectProfile'));
+    assert.ok(app.includes('catch (error)'));
+    assert.ok(app.includes('?? ?? ??? ??????.'));
+  }
+});

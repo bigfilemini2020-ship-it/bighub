@@ -258,12 +258,12 @@
     };
   }
 
-  function rejectSignupRequest(state, requestId, now = new Date().toISOString()) {
+  function rejectSignupRequest(state, requestId) {
     const request = (state.signupRequests || []).find((item) => item.id === requestId);
     if (!request || request.status !== "pending") return state;
     return {
       ...state,
-      signupRequests: state.signupRequests.map((item) => item.id === requestId ? { ...item, status: "rejected", rejectedAt: now } : item),
+      signupRequests: state.signupRequests.filter((item) => item.id !== requestId),
     };
   }
 

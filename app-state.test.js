@@ -314,8 +314,7 @@ test("signup request can be rejected", () => {
 
   state = rejectSignupRequest(state, state.signupRequests[0].id, "2026-08-04T10:00:00.000Z");
 
-  assert.equal(state.signupRequests[0].status, "rejected");
-  assert.equal(state.signupRequests[0].rejectedAt, "2026-08-04T10:00:00.000Z");
+  assert.equal(state.signupRequests.length, 0);
   assert.equal(authenticateUser(state, { loginId: "rejectuser", password: "pass1234" }), null);
 });
 

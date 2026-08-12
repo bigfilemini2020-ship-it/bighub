@@ -1154,8 +1154,22 @@ document.addEventListener("click", async (event) => {
     render();
     return;
   }
-  if (target.dataset.action === "approve-signup") { if (remoteAuth()) { window.BigHubSupabase.approveProfile(target.dataset.requestId).then(refreshRemoteData).then(render); return; } state = S.approveSignupRequest(state, target.dataset.requestId); }
-  if (target.dataset.action === "reject-signup") { if (remoteAuth()) { window.BigHubSupabase.rejectProfile(target.dataset.requestId).then(refreshRemoteData).then(render); return; } state = S.rejectSignupRequest(state, target.dataset.requestId); }
+  if (target.dataset.action === "approve-signup") {
+    if (remoteAuth()) {
+      try { await window.BigHubSupabase.approveProfile(target.dataset.requestId); await refreshRemoteData(); render(); }
+      catch (error) { alert(error.message || "?? ?? ??? ??????."); }
+      return;
+    }
+    state = S.approveSignupRequest(state, target.dataset.requestId);
+  }
+  if (target.dataset.action === "reject-signup") {
+    if (remoteAuth()) {
+      try { await window.BigHubSupabase.rejectProfile(target.dataset.requestId); await refreshRemoteData(); render(); }
+      catch (error) { alert(error.message || "?? ?? ??? ??????."); }
+      return;
+    }
+    state = S.rejectSignupRequest(state, target.dataset.requestId);
+  }
   saveState();
   render();
 });

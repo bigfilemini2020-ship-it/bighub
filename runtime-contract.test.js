@@ -70,7 +70,8 @@ test("signup edge functions are wired to request table and admin auth", () => {
   assert.match(approveSignup, /sb_secret_/);
   assert.match(approveSignup, /auth\/v1\/admin\/users/);
   assert.match(approveSignup, /password_ciphertext: null/);
-  assert.match(rejectSignup, /status: "rejected"/);
+  assert.match(rejectSignup, /method: "DELETE"/);
+  assert.doesNotMatch(rejectSignup, /status: "rejected"/);
   for (const source of [requestSignup, approveSignup, rejectSignup]) {
     assert.ok(source.includes('replace(/\\/$/, "")'));
     assert.ok(!source.includes('replace(//$/, "")'));
