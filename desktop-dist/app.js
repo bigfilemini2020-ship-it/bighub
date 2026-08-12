@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-comments-drawer-1";
+const webAppVersion = "2026.08.12-comments-drawer-2";
 const S = window.EducationState;
 
 let state = loadState();
@@ -933,6 +933,20 @@ function sortFeedPosts(posts) {
   });
 }
 
+// Rebuilding the feed re-creates every embedded player, so the video reloads.
+// The drawer lives outside the feed: opening it only needs the drawer itself
+// and the comment buttons' state.
+function syncCommentButtons() {
+  const openId = [...openCommentPostIds][0] || "";
+  document.querySelectorAll('[data-action="toggle-comments"]').forEach((button) => {
+    button.classList.toggle("active", button.dataset.postId === openId);
+    const count = state.comments.filter((comment) => comment.postId === button.dataset.postId).length;
+    const label = button.querySelector("span");
+    if (label) label.textContent = `댓글 ${count}`;
+  });
+  renderCommentsDrawer();
+}
+
 // Comments open in a drawer over the side panel rather than inside the card:
 // inline they pushed the post up and off screen. One post at a time, so
 // openCommentPostIds holds at most one id.
@@ -1151,7 +1165,7 @@ function formatDate(value) { const date = new Date(value); return Number.isNaN(d
 
 document.addEventListener("click", async (event) => {
   const focusTarget = event.target.closest("[data-focus-comment]");
-  if (focusTarget) { openCommentPostIds.clear(); openCommentPostIds.add(focusTarget.dataset.focusComment); render(); const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
+  if (focusTarget) { openCommentPostIds.clear(); openCommentPostIds.add(focusTarget.dataset.focusComment); syncCommentButtons(); const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
   const replyTarget = event.target.closest("[data-focus-reply]");
   if (replyTarget) { const form = replyTarget.closest(".comment")?.querySelector(".reply-form"); if (form) { form.classList.toggle("hidden"); form.querySelector("input")?.focus(); } return; }
   const target = event.target.closest("[data-action]");
@@ -1210,7 +1224,7 @@ document.addEventListener("click", async (event) => {
   }
   if (target.dataset.action === "close-comments") {
     openCommentPostIds.clear();
-    render();
+    syncCommentButtons();
     return;
   }
   if (target.dataset.action === "toggle-comments") {
@@ -1218,7 +1232,7 @@ document.addEventListener("click", async (event) => {
     const wasOpen = openCommentPostIds.has(postId);
     openCommentPostIds.clear();
     if (!wasOpen) openCommentPostIds.add(postId);
-    renderFeed();
+    syncCommentButtons();
     return;
   }
   if (target.dataset.action === "download-file") {
@@ -1246,7 +1260,7 @@ document.addEventListener("click", async (event) => {
       state = S.deleteComment(state, commentId);
       saveState();
     }
-    render();
+    syncCommentButtons();
     return;
   }
   if (target.dataset.action === "approve-signup") {
@@ -1320,6 +1334,9 @@ document.addEventListener("submit", async (event) => {
       state = S.addComment(state, { ...data, postId: form.dataset.postId, parentId: form.dataset.parentId || "", userId: currentUserId });
       saveState();
     }
+    form.reset();
+    syncCommentButtons();
+    return;
   }
   form.reset();
   render();
