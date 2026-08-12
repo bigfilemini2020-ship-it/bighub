@@ -12,5 +12,9 @@
       "https://drive.google.com/**"
     ]
   },
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "dialog:allow-message",
+    "dialog:allow-confirm"
+  ]
 }

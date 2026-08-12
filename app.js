@@ -134,7 +134,7 @@ async function checkDesktopUpdate(options = {}) {
       const version = info.version || "새 버전";
       updateDesktopUpdateStatus(`${version} 업데이트가 있습니다.`, false);
       if (options.silent) {
-        const ok = confirm(`BigHub ${version} 업데이트가 있습니다. 지금 설치할까요?`);
+        const ok = await confirm(`BigHub ${version} 업데이트가 있습니다. 지금 설치할까요?`);
         if (ok) await installDesktopUpdate();
       }
     } else if (!options.silent) {
@@ -160,7 +160,7 @@ function desktopUpdateErrorMessage(error) {
 async function installDesktopUpdate() {
   if (!isDesktopApp()) return;
   const version = desktopUpdateInfo?.version || "새 버전";
-  const ok = confirm(`BigHub ${version} 업데이트를 설치합니다. 설치 중 앱이 자동으로 종료될 수 있습니다.`);
+  const ok = await confirm(`BigHub ${version} 업데이트를 설치합니다. 설치 중 앱이 자동으로 종료될 수 있습니다.`);
   if (!ok) return;
   updateDesktopUpdateStatus("업데이트 다운로드 및 설치 중...", true);
   try {
@@ -447,6 +447,14 @@ function bindAuthForms() {
   byId("loginForm").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget));
+    // A failed sign-in costs two round trips: the auth call, then the pending
+    // lookup. Without this the button sits idle and looks stuck.
+    const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+    const submitLabel = submitButton?.textContent || "로그인";
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = "로그인 중...";
+    }
     try {
       const user = remoteAuth() ? await window.BigHubSupabase.signIn(data) : S.authenticateUser(state, data);
       if (!user) { showLoginError("\uC2B9\uC778\uB41C \uACC4\uC815\uC774 \uC5C6\uAC70\uB098 \uBE44\uBC00\uBC88\uD638\uAC00 \uB9DE\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."); return; }
@@ -463,6 +471,11 @@ function bindAuthForms() {
       if (syncError) alert("\uB85C\uADF8\uC778\uC740 \uB410\uC9C0\uB9CC \uAC8C\uC2DC\uAE00 \uB3D9\uAE30\uD654\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. Supabase SQL \uC5C5\uB370\uC774\uD2B8\uAC00 \uD544\uC694\uD569\uB2C8\uB2E4.\n\n" + syncError);
     } catch (error) {
       showLoginError(error.message || "\uB85C\uADF8\uC778\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.");
+    } finally {
+      if (submitButton) {
+        submitButton.disabled = false;
+        submitButton.textContent = submitLabel;
+      }
     }
   });
   byId("signupForm").addEventListener("submit", async (event) => {
@@ -1113,7 +1126,7 @@ document.addEventListener("click", async (event) => {
     const postId = target.dataset.postId;
     const post = state.posts.find((item) => item.id === postId);
     if (!post || !canManagePost(post)) return;
-    if (!confirm("이 게시글을 삭제할까요? 삭제하면 댓글과 완료 기록도 함께 삭제됩니다.")) return;
+    if (!(await confirm("이 게시글을 삭제할까요? 삭제하면 댓글과 완료 기록도 함께 삭제됩니다."))) return;
     if (remoteAuth()) {
       try { await window.BigHubSupabase.deletePost(postId); await refreshRemoteData(); }
       catch (error) { alert(error.message || "게시글 삭제에 실패했습니다."); return; }

@@ -123,6 +123,30 @@ test("cache-buster tokens match webAppVersion in every bundle", () => {
   }
 });
 
+// Tauri routes window.alert/confirm through the dialog plugin, so both need ACL
+// permissions or every dialog in the app dies as an unhandled rejection. That is
+// what bighub-client.log recorded: 30 denials of plugin:dialog|message and 3 of
+// plugin:dialog|confirm. File dialogs stay out — the capability also covers
+// remote URLs, and directory picking has its own Rust command.
+test("desktop capability grants the dialog commands alert and confirm need", () => {
+  const capability = JSON.parse(fs.readFileSync(path.join(__dirname, "src-tauri/capabilities/default.json"), "utf8"));
+  assert.ok(capability.permissions.includes("dialog:allow-message"), "alert() needs dialog:allow-message");
+  assert.ok(capability.permissions.includes("dialog:allow-confirm"), "confirm() needs dialog:allow-confirm");
+  assert.ok(!capability.permissions.includes("dialog:default"), "dialog:default would also grant file open/save");
+});
+
+// Under Tauri confirm() resolves asynchronously, so an unawaited call yields a
+// Promise -- always truthy. `if (!confirm(...)) return;` then deletes without
+// asking. Awaiting is correct in the browser too, where it is already a boolean.
+test("every confirm() is awaited", () => {
+  for (const dir of [".", "desktop-dist"]) {
+    const app = fs.readFileSync(path.join(__dirname, dir, "app.js"), "utf8");
+    const unawaited = Array.from(app.matchAll(/(?<!await\s)\bconfirm\(/g))
+      .map((match) => app.slice(Math.max(0, match.index - 60), match.index + 40).split("\n").pop());
+    assert.deepEqual(unawaited, [], `${dir}/app.js has an unawaited confirm()`);
+  }
+});
+
 // A pending user has no auth account, so signInWithPassword cannot distinguish
 // them from a wrong password. The status check inside signIn runs only after a
 // successful sign-in and never fires for them.
