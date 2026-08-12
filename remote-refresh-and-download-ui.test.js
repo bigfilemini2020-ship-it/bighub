@@ -256,13 +256,16 @@ test("post form uses JavaScript submit handler without inline cancellation", () 
   }
 });
 
-test("signup submit resets the submitted form without referencing a missing form variable", () => {
+test("signup submit keeps the submitted form reference across async signup", () => {
   for (const bundle of bundles) {
     const source = fs.readFileSync(path.join(__dirname, bundle), "utf8");
     const start = source.indexOf('byId("signupForm").addEventListener("submit"');
     const end = source.indexOf("function loadImage", start);
     const signup = source.slice(start, end);
-    assert.match(signup, /event.currentTarget.reset/);
+    assert.match(signup, /const signupForm = event.currentTarget/);
+    assert.match(signup, /new FormData\(signupForm\)/);
+    assert.match(signup, /signupForm.reset()/);
+    assert.doesNotMatch(signup, /event.currentTarget.reset/);
     assert.doesNotMatch(signup, /form.reset/);
   }
 });

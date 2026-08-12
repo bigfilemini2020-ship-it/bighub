@@ -459,7 +459,8 @@ function bindAuthForms() {
   });
   byId("signupForm").addEventListener("submit", async (event) => {
     event.preventDefault();
-    const data = Object.fromEntries(new FormData(event.currentTarget));
+    const signupForm = event.currentTarget;
+    const data = Object.fromEntries(new FormData(signupForm));
     try {
       if (remoteAuth()) {
         await window.BigHubSupabase.signUp(data);
@@ -467,8 +468,7 @@ function bindAuthForms() {
         state = S.createSignupRequest(state, data);
         saveState();
       }
-      if (typeof event.currentTarget.reset === "function") event.currentTarget.reset();
-      byId("signupMessage").textContent = "가입 신청이 접수됐습니다. 관리자 승인 후 로그인할 수 있습니다.";
+      if (typeof signupForm.reset === "function") signupForm.reset();
       if (remoteAuth()) await refreshRemoteData();
       setAuthMode("login");
       byId("loginMessage").textContent = "가입 신청이 접수됐습니다. 승인 후 로그인하세요.";
@@ -476,6 +476,12 @@ function bindAuthForms() {
       render();
     } catch (error) {
       const message = error.message || "가입 신청에 실패했습니다.";
+      if (message.includes("이미 가입 신청된 아이디")) {
+        setAuthMode("login");
+        byId("loginMessage").textContent = message;
+        alert(message);
+        return;
+      }
       byId("signupMessage").textContent = message;
       alert(`가입 신청 실패: ${message}`);
     }

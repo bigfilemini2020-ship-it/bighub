@@ -1,4 +1,4 @@
-const assert = require("node:assert/strict");
+﻿const assert = require("node:assert/strict");
 const { execFileSync } = require("node:child_process");
 const test = require("node:test");
 
@@ -155,3 +155,16 @@ test("compose form code is split into its own browser bundle", () => {
     assert.ok(compose.includes(marker), `compose bundle contains ${marker}`);
   }
 });
+test("signup submit keeps form reference and guides duplicate requests", () => {
+  for (const file of ["app.js", "desktop-dist/app.js"]) {
+    const app = require("node:fs").readFileSync(file, "utf8");
+    assert.match(app, /const signupForm = event.currentTarget/);
+    assert.ok(app.includes("new FormData(signupForm)"));
+    assert.ok(app.includes("signupForm.reset()"));
+    assert.ok(!app.includes("event.currentTarget.reset"));
+    assert.ok(app.includes('message.includes("'));
+    assert.ok(app.includes('byId("loginMessage").textContent = message'));
+    assert.ok(app.includes('setAuthMode("login")'));
+  }
+});
+
