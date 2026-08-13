@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-align-drawer-1";
+const webAppVersion = "2026.08.12-align-drawer-2";
 const S = window.EducationState;
 
 let state = loadState();
@@ -935,17 +935,18 @@ function sortFeedPosts(posts) {
 // Rebuilding the feed re-creates every embedded player, so the video reloads.
 // The drawer lives outside the feed: opening it only needs the drawer itself
 // and the comment buttons' state.
-// Line the post up with the top of its drawer. Matching the drawer's height to
-// the post instead would leave almost no room for comments on a short one, so
-// only the tops meet.
-function alignPostWithDrawer(postId) {
-  const card = document.querySelector(`.feed-card[data-post-id="${postId}"]`);
+// Drop the drawer to the post's line rather than scrolling the post up to the
+// drawer: the reader keeps their place in the feed. Matching the drawer's
+// height to the post as well would leave a three-line post almost no room for
+// comments, so only the tops meet.
+function alignDrawerToPost(postId) {
   const drawer = byId("commentsDrawer");
-  if (!card || !drawer || drawer.classList.contains("hidden")) return;
-  const delta = Math.round(card.getBoundingClientRect().top - drawer.getBoundingClientRect().top);
-  // Instant, not smooth: the drawer itself appears instantly, and a smooth
-  // request is silently dropped in some webviews.
-  if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: "auto" });
+  if (!drawer) return;
+  const card = document.querySelector(`.feed-card[data-post-id="${postId}"]`);
+  const column = document.querySelector(".feed-column");
+  if (!card || !column) { drawer.style.marginTop = ""; return; }
+  const offset = Math.round(card.getBoundingClientRect().top - column.getBoundingClientRect().top);
+  drawer.style.marginTop = `${Math.max(0, offset)}px`;
 }
 
 function syncCommentButtons() {
@@ -971,6 +972,7 @@ function renderCommentsDrawer() {
     openCommentPostIds.clear();
     drawer.classList.add("hidden");
     drawer.innerHTML = "";
+    drawer.style.marginTop = "";
     return;
   }
   const comments = state.comments.filter((comment) => comment.postId === post.id);
@@ -979,6 +981,7 @@ function renderCommentsDrawer() {
     : `<p class="comments-drawer-empty">첫 댓글을 남겨보세요.</p>`;
   drawer.classList.remove("hidden");
   drawer.innerHTML = `<header class="comments-drawer-head"><strong>댓글 ${comments.length}</strong><button class="modal-close" data-action="close-comments" type="button" aria-label="닫기">×</button></header><div class="comments-drawer-post">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(post.title)}</strong><span>${escapeHtml(userName(post.authorId))} · ${postTypeLabel(post.type)}</span></div></div><div class="comments-drawer-body">${list}</div><form class="inline-form comments-drawer-form" data-action="comment" data-post-id="${escapeHtml(post.id)}"><input id="comment-${escapeHtml(post.id)}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form>`;
+  alignDrawerToPost(post.id);
 }
 
 function canManageComment(comment) {
@@ -1172,7 +1175,7 @@ function formatDate(value) { const date = new Date(value); return Number.isNaN(d
 
 document.addEventListener("click", async (event) => {
   const focusTarget = event.target.closest("[data-focus-comment]");
-  if (focusTarget) { openCommentPostIds.clear(); openCommentPostIds.add(focusTarget.dataset.focusComment); syncCommentButtons(); alignPostWithDrawer(focusTarget.dataset.focusComment); const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
+  if (focusTarget) { openCommentPostIds.clear(); openCommentPostIds.add(focusTarget.dataset.focusComment); syncCommentButtons(); const input = byId(`comment-${focusTarget.dataset.focusComment}`); if (input) input.focus(); return; }
   const replyTarget = event.target.closest("[data-focus-reply]");
   if (replyTarget) { const form = replyTarget.closest(".comment")?.querySelector(".reply-form"); if (form) { form.classList.toggle("hidden"); form.querySelector("input")?.focus(); } return; }
   const target = event.target.closest("[data-action]");
@@ -1235,7 +1238,6 @@ document.addEventListener("click", async (event) => {
     openCommentPostIds.clear();
     if (!wasOpen) openCommentPostIds.add(postId);
     syncCommentButtons();
-    if (!wasOpen) alignPostWithDrawer(postId);
     return;
   }
   if (target.dataset.action === "download-file") {
