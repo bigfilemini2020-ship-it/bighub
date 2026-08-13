@@ -161,6 +161,21 @@ test("cache-buster tokens match webAppVersion in every bundle", () => {
   }
 });
 
+// checkDesktopUpdate holds desktopUpdateChecking for its whole body. Awaiting a
+// dialog inside it kept that flag set while the prompt waited, so the settings
+// button returned null and did nothing on 0.1.33.
+test("the update check never waits on a dialog while holding its guard", () => {
+  for (const dir of [".", "desktop-dist"]) {
+    const app = fs.readFileSync(path.join(__dirname, dir, "app.js"), "utf8");
+    const start = app.indexOf("async function checkDesktopUpdate(");
+    assert.ok(start > -1, `${dir}/app.js must define checkDesktopUpdate`);
+    const body = app.slice(start, app.indexOf("\n}", start));
+    assert.doesNotMatch(body, /\bconfirm\(/, `${dir}: prompt outside the guarded check`);
+    assert.doesNotMatch(body, /installDesktopUpdate\(/, `${dir}: install outside the guarded check`);
+    assert.match(body, /desktopUpdateChecking = false;/, `${dir}: the guard must still be released`);
+  }
+});
+
 // Tauri routes window.alert/confirm through the dialog plugin, so both need ACL
 // permissions or every dialog in the app dies as an unhandled rejection. That is
 // what bighub-client.log recorded: 30 denials of plugin:dialog|message and 3 of

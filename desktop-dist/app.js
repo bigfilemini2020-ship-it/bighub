@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-pause-offscreen-1";
+const webAppVersion = "2026.08.13-update-button-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -130,22 +130,28 @@ async function checkDesktopUpdate(options = {}) {
     if (info?.currentVersion) desktopAppVersion = info.currentVersion;
     renderVersionStatus();
     if (info?.available) {
-      const version = info.version || "새 버전";
-      updateDesktopUpdateStatus(`${version} 업데이트가 있습니다.`, false);
-      if (options.silent) {
-        const ok = await confirm(`BigHub ${version} 업데이트가 있습니다. 지금 설치할까요?`);
-        if (ok) await installDesktopUpdate();
-      }
+      updateDesktopUpdateStatus(`${info.version || "새 버전"} 업데이트가 있습니다.`, false);
     } else if (!options.silent) {
       updateDesktopUpdateStatus(`현재 최신 버전입니다. (${info?.currentVersion || "현재 버전"})`, false);
     }
     return info;
   } catch (error) {
+    clientLog("update-check-failed", { message: String(error?.message || error || "") });
     if (!options.silent) updateDesktopUpdateStatus(desktopUpdateErrorMessage(error), false);
     return null;
   } finally {
     desktopUpdateChecking = false;
   }
+}
+
+// Prompt and install outside checkDesktopUpdate. Asking inside it held
+// desktopUpdateChecking for as long as the dialog waited, so the settings
+// button hit the re-entrancy guard and returned null -- pressing it did
+// nothing at all.
+async function offerDesktopUpdate(info) {
+  if (!info?.available) return;
+  clientLog("update-available", { version: info.version || "" });
+  await installDesktopUpdate();
 }
 
 function desktopUpdateErrorMessage(error) {
@@ -162,9 +168,11 @@ async function installDesktopUpdate() {
   const ok = await confirm(`BigHub ${version} 업데이트를 설치합니다. 설치 중 앱이 자동으로 종료될 수 있습니다.`);
   if (!ok) return;
   updateDesktopUpdateStatus("업데이트 다운로드 및 설치 중...", true);
+  clientLog("update-install-start", { version });
   try {
     await desktopInvoke("install_desktop_update");
   } catch (error) {
+    clientLog("update-install-failed", { message: String(error?.message || error || "") });
     updateDesktopUpdateStatus(error.message || "업데이트 설치에 실패했습니다.", false);
   }
 }
@@ -309,7 +317,7 @@ async function init() {
   bindDesktopSettings();
   await loadDesktopSettings();
   await loadDesktopAppVersion();
-  setTimeout(() => checkDesktopUpdate({ silent: true }), 2500);
+  setTimeout(async () => offerDesktopUpdate(await checkDesktopUpdate({ silent: true })), 2500);
   if (remoteAuth()) await restoreRemoteSession();
   applySavedFeedFilter();
   render();
@@ -653,7 +661,7 @@ function bindDesktopSettings() {
     const settingsStatus = byId("desktopSettingsStatus");
     if (settingsStatus) settingsStatus.textContent = "";
     const info = await checkDesktopUpdate();
-    if (info?.available) await installDesktopUpdate();
+    await offerDesktopUpdate(info);
   });
   byId("desktopDownloadDirButton")?.addEventListener("click", async () => {
     const status = byId("desktopSettingsStatus");

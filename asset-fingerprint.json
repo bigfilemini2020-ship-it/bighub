@@ -1,5 +1,5 @@
 {
-  "webAppVersion": "2026.08.12-pause-offscreen-1",
+  "webAppVersion": "2026.08.13-update-button-1",
   "assets": [
     "styles.css",
     "supabase-config.js",
@@ -10,5 +10,5 @@
     "app-compose.js",
     "app.js"
   ],
-  "sha256": "b6bc55461abcd27b169d3a12f6fee03a3fe4681dfee21049ec145043f2f399eb"
+  "sha256": "c544f95f8e047960a5fb0d4b72ed04a5e22a6b80a977e355326e10b536594c3e"
 }
