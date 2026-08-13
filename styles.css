@@ -90,7 +90,7 @@ textarea {
   gap: 12px;
   min-height: 46px;
   margin-bottom: 20px;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .rail-logo {
@@ -106,7 +106,7 @@ textarea {
 
 .rail-button {
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
   border: 0;
   border-radius: var(--r-md);
   background: transparent;
@@ -121,11 +121,11 @@ textarea {
 .rail-button span {
   width: 24px;
   text-align: center;
-  font-size: 19px;
+  font-size: 21px;
 }
 
 .rail-button strong {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .rail-button:hover,
@@ -193,7 +193,7 @@ textarea {
 .panel-block p {
   margin: 3px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.45;
 }
 
@@ -219,8 +219,8 @@ textarea {
   border-radius: var(--r-pill);
   background: var(--surface);
   color: var(--text);
-  min-height: 34px;
-  padding: 7px 14px;
+  min-height: 38px;
+  padding: 8px 16px;
 }
 
 .filter-chip.active {
@@ -277,7 +277,7 @@ textarea {
 .author-line strong,
 .profile-card strong {
   display: block;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .author-line span,
@@ -285,7 +285,7 @@ textarea {
 .feed-meta {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .post-type {
@@ -293,7 +293,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   padding: 4px 9px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -330,7 +330,7 @@ textarea {
 .file-preview strong {
   display: block;
   margin-top: 12px;
-  font-size: 22px;
+  font-size: 24px;
 }
 
 .file-icon {
@@ -358,7 +358,7 @@ textarea {
   border: 0;
   background: transparent;
   border-radius: var(--r-sm);
-  font-size: 21px;
+  font-size: 23px;
 }
 
 .icon-action:hover,
@@ -378,7 +378,7 @@ textarea {
   margin-left: auto;
   color: var(--text);
   text-decoration: none;
-  font-size: 20px;
+  font-size: 22px;
   padding: 6px 8px;
   border-radius: var(--r-sm);
 }
@@ -394,19 +394,19 @@ textarea {
 .feed-counts {
   margin: 0 0 8px;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .feed-body h3 {
   margin: 0 0 5px;
-  font-size: 15px;
+  font-size: 17px;
 }
 
 .feed-body p {
   margin: 0;
   color: var(--text);
   line-height: 1.48;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .attachment-line {
@@ -432,7 +432,7 @@ textarea {
 .comment,
 .answer {
   color: var(--text);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.45;
 }
 
@@ -474,7 +474,7 @@ textarea {
 .side-panel label {
   margin-bottom: -12px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -492,7 +492,7 @@ textarea {
 
 .panel-title span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .stats {
@@ -505,7 +505,7 @@ textarea {
   justify-content: space-between;
   gap: 10px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .stat-row strong {
@@ -522,7 +522,7 @@ textarea {
 .question-card h3,
 .progress-card h3 {
   margin: 0 0 7px;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .resource-card p,
@@ -544,7 +544,7 @@ textarea {
   margin-bottom: 10px;
   background: var(--soft);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -567,7 +567,7 @@ textarea {
 
 .progress-sections h2 {
   margin: 0 0 12px;
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .progress-card .bar {
@@ -652,12 +652,12 @@ textarea {
 }
 
 .text-card .feed-body h3 {
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1.35;
 }
 
 .text-card .feed-body p:not(.feed-counts) {
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1.65;
 }
 
@@ -674,7 +674,7 @@ textarea {
 
 .search-panel h2 {
   margin: 0 0 12px;
-  font-size: 20px;
+  font-size: 22px;
 }
 
 .result-card .status-pill {
@@ -731,7 +731,7 @@ textarea {
 
 .compose-header h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 19px;
 }
 
 .modal-close {
@@ -741,7 +741,7 @@ textarea {
   border: 0;
   border-radius: 50%;
   background: transparent;
-  font-size: 26px;
+  font-size: 28px;
 }
 
 .modal-close:hover {
@@ -774,7 +774,7 @@ textarea {
 }
 
 .upload-icon {
-  font-size: 42px;
+  font-size: 44px;
 }
 
 .modal-form button[type="submit"] {
@@ -800,7 +800,7 @@ textarea {
 .form-help {
   margin: -2px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.45;
 }
 
@@ -821,7 +821,7 @@ textarea {
   padding: 0 10px;
   background: transparent;
   color: var(--text);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -906,7 +906,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1;
 }
@@ -926,7 +926,7 @@ textarea {
 .completion-avatar.more-count {
   background: var(--text);
   color: var(--surface);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .text-card {
@@ -984,7 +984,7 @@ textarea {
 
 .auth-brand span {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .auth-grid {
@@ -1004,7 +1004,7 @@ textarea {
 
 .auth-form h1 {
   margin: 0 0 8px;
-  font-size: 22px;
+  font-size: 24px;
 }
 
 .auth-form button,
@@ -1021,14 +1021,14 @@ textarea {
   margin-left: auto;
   background: white;
   color: var(--text);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .form-message {
   min-height: 18px;
   margin: 0;
   color: #2563eb;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .date-grid {
@@ -1056,7 +1056,7 @@ textarea {
   align-items: center;
   gap: 8px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .check-grid {
@@ -1089,7 +1089,7 @@ textarea {
 .mini-item span,
 .mini-empty {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 @media (max-width: 720px) {
@@ -1108,7 +1108,7 @@ textarea {
   align-items: center;
   margin: 2px 0 4px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .auth-options label {
@@ -1181,7 +1181,7 @@ textarea {
   gap: 6px;
   min-height: 18px;
   color: var(--primary);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .upload-status i {
@@ -1334,7 +1334,7 @@ textarea {
 
 .feed-body h3 {
   margin-bottom: 12px;
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1.4;
 }
 
@@ -1353,7 +1353,7 @@ textarea {
 }
 
 .text-card .feed-body h3 {
-  font-size: 17px;
+  font-size: 19px;
 }
 
 .feed-counts {
@@ -1373,7 +1373,7 @@ textarea {
 .save-link {
   border: 0;
   background: transparent;
-  font-size: 20px;
+  font-size: 22px;
   cursor: pointer;
 }
 
@@ -1406,7 +1406,7 @@ textarea {
 
 .drive-attachment strong {
   color: var(--text);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .compose-dialog {
@@ -1423,7 +1423,7 @@ textarea {
 }
 
 .compose-header h2 {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .modal-form {
@@ -1461,7 +1461,7 @@ textarea {
 .upload-copy p {
   width: auto;
   margin-top: 2px;
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .upload-icon {
@@ -1473,7 +1473,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: var(--surface);
-  font-size: 22px;
+  font-size: 24px;
 }
 
 .upload-status {
@@ -1487,7 +1487,7 @@ textarea {
 }
 
 .mission-settings legend {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .check-grid,
@@ -1585,7 +1585,7 @@ textarea {
   background: var(--surface);
   color: var(--muted);
   padding: 0 10px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -1636,7 +1636,7 @@ textarea {
   color: var(--muted);
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
   padding: 0;
 }
 
@@ -1661,7 +1661,7 @@ textarea {
   gap: 8px;
   min-height: 42px;
   color: var(--text);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .completion-toggle input {
@@ -1711,7 +1711,7 @@ textarea {
   color: var(--text);
   text-align: left;
   padding: 0 14px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .post-menu-popover button:hover,
@@ -1756,14 +1756,14 @@ textarea {
   border: 1px solid var(--line);
   background: var(--soft);
   color: var(--text);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
 }
 
 .comment.reply .comment-avatar {
   width: 24px;
   height: 24px;
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .comment-avatar.admin-icon {
@@ -1778,14 +1778,14 @@ textarea {
 .comment-content p {
   margin: 0;
   color: var(--text);
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
 .comment-content strong {
   margin-right: 7px;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
 }
 
@@ -1807,7 +1807,7 @@ textarea {
   color: var(--muted);
   cursor: pointer;
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   padding: 4px 8px;
 }
@@ -1977,7 +1977,7 @@ textarea {
   justify-content: center;
   text-align: center;
   line-height: 1;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .settings-panel {
@@ -1989,14 +1989,14 @@ textarea {
 
 .settings-head h2 {
   margin: 0 0 6px;
-  font-size: 22px;
+  font-size: 24px;
 }
 
 .settings-head p,
 .settings-status {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .settings-card {
@@ -2025,7 +2025,7 @@ textarea {
 }
 
 .setting-row strong {
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text);
 }
 
@@ -2096,7 +2096,7 @@ textarea {
   border-radius: var(--r-pill);
   padding: 8px 13px;
   background: var(--surface);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -2241,7 +2241,7 @@ textarea {
 
 .attachment-list .drive-attachment strong {
   display: block;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--muted);
   margin-bottom: 2px;
 }
@@ -2347,7 +2347,7 @@ textarea {
 }
 
 .selected-file-list strong {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text);
 }
 
@@ -2374,7 +2374,7 @@ textarea {
 .selected-file-row small,
 .selected-file-empty {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .selected-file-remove {
@@ -2412,12 +2412,12 @@ textarea {
 
 .download-toast strong {
   min-width: 0;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .download-toast span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -2528,7 +2528,7 @@ textarea {
 }
 
 .comments-drawer-head strong {
-  font-size: 15px;
+  font-size: 17px;
 }
 
 .comments-drawer-body {
@@ -2544,7 +2544,7 @@ textarea {
 .comments-drawer-empty {
   margin: 24px 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
   text-align: center;
 }
 
