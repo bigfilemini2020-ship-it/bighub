@@ -176,6 +176,21 @@ test("the update check never waits on a dialog while holding its guard", () => {
   }
 });
 
+// The dialog plugin kept refusing: bighub-client.log recorded
+// "plugin:dialog|confirm not allowed by ACL" even on builds whose capability
+// lists dialog:allow-confirm. A refused dialog rejects, so nothing appears and
+// no answer arrives -- the delete confirmation and the update prompt both died
+// that way. The app owns both dialogs now and depends on no plugin.
+test("alert and confirm are the app's own, not the dialog plugin's", () => {
+  for (const dir of [".", "desktop-dist"]) {
+    const app = fs.readFileSync(path.join(__dirname, dir, "app.js"), "utf8");
+    assert.match(app, /^function alert\(message\) \{/m, `${dir}: alert must be the app's`);
+    assert.match(app, /^function confirm\(message\) \{/m, `${dir}: confirm must be the app's`);
+    assert.match(app, /function showAppDialog\(message, options = \{\}\) \{/, `${dir}: shared dialog implementation`);
+    assert.match(app, /resolve\(value\)/, `${dir}: the dialog must resolve an answer`);
+  }
+});
+
 // Tauri routes window.alert/confirm through the dialog plugin, so both need ACL
 // permissions or every dialog in the app dies as an unhandled rejection. That is
 // what bighub-client.log recorded: 30 denials of plugin:dialog|message and 3 of
@@ -194,7 +209,8 @@ test("desktop capability grants the dialog commands alert and confirm need", () 
 test("every confirm() is awaited", () => {
   for (const dir of [".", "desktop-dist"]) {
     const app = fs.readFileSync(path.join(__dirname, dir, "app.js"), "utf8");
-    const unawaited = Array.from(app.matchAll(/(?<!await\s)\bconfirm\(/g))
+    // "function confirm(" is the app's own declaration, not a call site.
+    const unawaited = Array.from(app.matchAll(/(?<!await\s)(?<!function )\bconfirm\(/g))
       .map((match) => app.slice(Math.max(0, match.index - 60), match.index + 40).split("\n").pop());
     assert.deepEqual(unawaited, [], `${dir}/app.js has an unawaited confirm()`);
   }

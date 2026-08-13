@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.13-update-visible-1";
+const webAppVersion = "2026.08.13-in-app-dialogs-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -454,6 +454,45 @@ function setAuthMode(mode) {
 }
 // Alert as well as the inline line: the inline text sits below the fold on short
 // windows and users kept missing it.
+// Tauri routes window.alert/confirm through the dialog plugin, and this build
+// still gets "plugin:dialog|confirm not allowed by ACL" -- a blocked dialog
+// rejects, so the message never appears and the answer never arrives. Both are
+// replaced with in-app dialogs: no plugin, no permission, and they can be
+// exercised in a browser. Defining them at top level shadows the built-ins, so
+// every existing call site keeps working.
+function showAppDialog(message, options = {}) {
+  return new Promise((resolve) => {
+    const host = document.createElement("div");
+    host.className = "app-dialog";
+    const cancel = options.cancel ? `<button type="button" class="app-dialog-cancel" data-dialog="cancel">취소</button>` : "";
+    host.innerHTML = `<div class="app-dialog-backdrop" data-dialog="cancel"></div><section class="app-dialog-box" role="alertdialog" aria-modal="true"><p>${escapeHtml(message)}</p><div class="app-dialog-actions">${cancel}<button type="button" class="app-dialog-accept" data-dialog="ok">확인</button></div></section>`;
+    const close = (value) => {
+      document.removeEventListener("keydown", onKey, true);
+      host.remove();
+      resolve(value);
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") close(false);
+      if (event.key === "Enter") close(true);
+    };
+    host.addEventListener("click", (event) => {
+      const choice = event.target.closest("[data-dialog]")?.dataset.dialog;
+      if (choice) close(choice === "ok");
+    });
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(host);
+    host.querySelector(".app-dialog-accept").focus();
+  });
+}
+
+function alert(message) {
+  return showAppDialog(String(message ?? ""), { cancel: false });
+}
+
+function confirm(message) {
+  return showAppDialog(String(message ?? ""), { cancel: true });
+}
+
 function showLoginError(message) {
   byId("loginMessage").textContent = message;
   alert(message);

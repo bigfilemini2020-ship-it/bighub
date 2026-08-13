@@ -2561,3 +2561,64 @@ textarea {
 .post-text + .post-text {
   margin-top: 10px;
 }
+
+/* In-app replacement for window.alert / window.confirm. The native ones go
+   through Tauri's dialog plugin, which this build's ACL blocks silently. */
+.app-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.app-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.app-dialog-box {
+  position: relative;
+  width: min(420px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+  padding: 22px 22px 18px;
+}
+
+.app-dialog-box p {
+  margin: 0 0 18px;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.5;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.app-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.app-dialog-actions button {
+  min-height: 40px;
+  border-radius: var(--r-sm);
+  padding: 8px 18px;
+  font-weight: 700;
+}
+
+.app-dialog-accept {
+  border: 0;
+  background: var(--primary);
+  color: #fff;
+}
+
+.app-dialog-cancel {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+}
