@@ -2084,37 +2084,6 @@ textarea {
   font-weight: 700;
 }
 
-.collapsed-card .feed-head {
-  border-bottom: 0;
-}
-
-.collapsed-card .feed-body {
-  padding-top: 0;
-}
-
-.collapsed-body .post-text {
-  color: var(--muted);
-  margin-bottom: 12px;
-}
-
-.expand-post-button {
-  width: fit-content;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  border-radius: 999px;
-  padding: 8px 13px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.expand-post-button:hover,
-.expand-post-button:focus-visible {
-  background: var(--soft);
-  outline: none;
-}
-
 .icon-action.comment {
   display: inline-flex;
 }

@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-layout-polish-1";
+const webAppVersion = "2026.08.12-no-collapse-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -36,7 +36,6 @@ function renderVersionStatus() {
   status.textContent = `${desktopText} · 웹 빌드 ${webAppVersion}`;
 }
 const notificationPollIntervalMs = 10000;
-let expandedPostIds = new Set();
 let openCommentPostIds = new Set();
 
 function loadState() {
@@ -1007,15 +1006,13 @@ function postCardHtml(post) {
   const reactions = state.reactions.filter((reaction) => reaction.postId === post.id);
   const comments = state.comments.filter((comment) => comment.postId === post.id);
   const mine = reactions.filter((reaction) => reaction.userId === currentUserId);
-  const userDone = mine.some((reaction) => reaction.sticker === "done");
   const doneCount = completionEnabled ? completion.completedCount : reactions.filter((reaction) => reaction.sticker === "done").length;
   const mediaUrl = post.mediaUrl || post.videoUrl || representativeAttachment(post)?.url || "";
   const presentation = S.getPostPresentation(post);
   const baseClass = presentation.kind === "text" ? "feed-card text-card" : "feed-card media-card";
-  const collapsed = completionEnabled && userDone && !expandedPostIds.has(post.id);
   const commentsOpen = openCommentPostIds.has(post.id);
-  const cardClass = collapsed ? `${baseClass} collapsed-card` : baseClass;
-  const preview = !collapsed && mediaUrl && presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post) : "";
+  const cardClass = baseClass;
+  const preview = mediaUrl && presentation.kind === "media" ? mediaPreviewHtml(mediaUrl, post) : "";
   const menuButton = canManagePost(post) ? postMenuHtml(post.id) : "";
   const doneLabel = post.type === "mission" ? `완료 ${doneCount}/${completion.totalMembers}` : `완료 ${doneCount}`;
   const doneAction = completionEnabled ? actionButton(post.id, "done", mine, "check", doneLabel) : "";
@@ -1023,9 +1020,6 @@ function postCardHtml(post) {
   const completionAvatars = completionEnabled ? completionAvatarStack(completion.completedUserIds) : "";
   const actions = `<div class="feed-actions">${commentAction}${doneAction}${completionAvatars}${saveControlHtml(post)}</div>`;
   const header = `<header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${menuButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>`;
-  if (collapsed) {
-    return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}">${header}<section class="feed-body collapsed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">확인한 글입니다.</p><button class="expand-post-button" data-action="expand-post" data-post-id="${escapeHtml(post.id)}" type="button">더보기</button>${actions}</section></article>`;
-  }
   return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}">${header}${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}${actions}</section></article>`;
 }
 function miniAvatarHtml(userId) {
@@ -1216,11 +1210,6 @@ document.addEventListener("click", async (event) => {
       return;
     }
     state = S.addReaction(state, reaction);
-  }
-  if (target.dataset.action === "expand-post") {
-    expandedPostIds.add(target.dataset.postId);
-    renderFeed();
-    return;
   }
   if (target.dataset.action === "close-comments") {
     openCommentPostIds.clear();
