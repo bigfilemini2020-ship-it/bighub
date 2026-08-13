@@ -241,7 +241,7 @@ test("question posts can include attachments and receive answer comments", () =>
 test("link preview detects youtube, image, html, and generic links", () => {
   assert.deepEqual(getLinkPreview("https://youtu.be/abc123"), {
     type: "youtube",
-    embedUrl: "https://www.youtube-nocookie.com/embed/abc123?rel=0&playsinline=1&iv_load_policy=3",
+    embedUrl: "https://www.youtube-nocookie.com/embed/abc123?rel=0&playsinline=1&iv_load_policy=3&enablejsapi=1",
     thumbnailUrl: "https://img.youtube.com/vi/abc123/hqdefault.jpg",
   });
   assert.equal(getLinkPreview("https://example.com/poster.png").type, "image");

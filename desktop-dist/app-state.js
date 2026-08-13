@@ -308,7 +308,7 @@
     if (youtubeId) {
       return {
         type: "youtube",
-        embedUrl: `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&playsinline=1&iv_load_policy=3`,
+        embedUrl: `https://www.youtube-nocookie.com/embed/${youtubeId}?rel=0&playsinline=1&iv_load_policy=3&enablejsapi=1`,
         thumbnailUrl: `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`,
       };
     }

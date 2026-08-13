@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-keep-player-alive-1";
+const webAppVersion = "2026.08.12-pause-offscreen-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -571,6 +571,33 @@ async function handleAvatarFile(file) {
   }
 }
 
+// Pause a player once its post has scrolled out of sight. A <video> we can
+// pause directly; a YouTube embed is cross-origin, so we post the player API's
+// pause command into it -- which is why the embed URL carries enablejsapi=1.
+let offscreenPauseObserver = null;
+
+function pauseMediaElement(element) {
+  if (element.tagName === "VIDEO") {
+    if (!element.paused) element.pause();
+    return;
+  }
+  element.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), "*");
+}
+
+function watchMediaLeavingView() {
+  if (!("IntersectionObserver" in window)) return;
+  if (!offscreenPauseObserver) {
+    offscreenPauseObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => { if (!entry.isIntersecting) pauseMediaElement(entry.target); });
+    }, { threshold: 0 });
+  }
+  document.querySelectorAll(".media-preview video, .youtube-preview iframe").forEach((element) => {
+    if (element.dataset.offscreenWatched) return;
+    element.dataset.offscreenWatched = "1";
+    offscreenPauseObserver.observe(element);
+  });
+}
+
 function bindMediaRenderGuards() {
   const holdEvents = new Set(["play", "playing", "waiting", "seeking", "stalled", "progress", "timeupdate", "fullscreenchange", "webkitfullscreenchange"]);
   holdEvents.forEach((name) => document.addEventListener(name, (event) => {
@@ -927,6 +954,7 @@ function renderFeed() {
   }
   hydrateDriveVideos();
   hydrateMuxVideos();
+  watchMediaLeavingView();
 }
 
 function sortFeedPosts(posts) {
