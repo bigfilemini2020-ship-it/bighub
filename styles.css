@@ -37,6 +37,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: Pretendard, "Malgun Gothic", "Segoe UI", sans-serif;
+  font-weight: 450;
   letter-spacing: 0;
 }
 
@@ -658,7 +659,7 @@ textarea {
 
 .text-card .feed-body p:not(.feed-counts) {
   font-size: 17px;
-  line-height: 1.65;
+  line-height: 1.5;
 }
 
 .media-card .feed-body h3 {
@@ -1339,7 +1340,7 @@ textarea {
 }
 
 .feed-body p {
-  line-height: 1.58;
+  line-height: 1.5;
 }
 
 .text-card {
@@ -1779,7 +1780,7 @@ textarea {
   margin: 0;
   color: var(--text);
   font-size: 16px;
-  line-height: 1.55;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 

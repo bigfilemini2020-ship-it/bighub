@@ -1,5 +1,5 @@
 {
-  "webAppVersion": "2026.08.12-larger-type-1",
+  "webAppVersion": "2026.08.12-tighter-type-1",
   "assets": [
     "styles.css",
     "supabase-config.js",
@@ -10,5 +10,5 @@
     "app-compose.js",
     "app.js"
   ],
-  "sha256": "507a5ee427049889e6c3800937bec633dcf161904492e495eeb8dae9c3d40917"
+  "sha256": "d82303fbde229234c74ae92e96f7438ff35801d4ebfd6e09370fe53bbacda64b"
 }
