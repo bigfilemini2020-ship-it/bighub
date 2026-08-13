@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-tighter-type-1";
+const webAppVersion = "2026.08.12-system-font-paragraphs-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -1016,6 +1016,15 @@ function commentsHtml(postId, comments) {
     .join("");
 }
 
+// white-space: pre-line turned every blank line an author typed into a full
+// empty line -- on a four-paragraph post that was a third of the body's height.
+// Paragraphs get a measured gap instead; single newlines still break.
+function postBodyHtml(body) {
+  const blocks = String(body || "").split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
+  if (!blocks.length) return "";
+  return blocks.map((block) => `<p class="post-text">${escapeHtml(block)}</p>`).join("");
+}
+
 function postCardHtml(post) {
   const completionEnabled = hasCompletionCheck(post);
   const completion = completionEnabled ? S.getPostCompletion(state, post.id) : { totalMembers: 0, completedCount: 0, completedUserIds: [] };
@@ -1036,7 +1045,7 @@ function postCardHtml(post) {
   const completionAvatars = completionEnabled ? completionAvatarStack(completion.completedUserIds) : "";
   const actions = `<div class="feed-actions">${commentAction}${doneAction}${completionAvatars}${saveControlHtml(post)}</div>`;
   const header = `<header class="feed-head"><div class="author-line">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(userName(post.authorId))}</strong><span>${postTypeLabel(post.type)} · ${formatDate(post.createdAt)}${dateText(post)}</span></div></div><div class="post-tools">${menuButton}<span class="post-type">${postTypeLabel(post.type)}</span></div></header>`;
-  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}">${header}${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3><p class="post-text">${escapeHtml(post.body)}</p>${attachmentHtml(post)}${actions}</section></article>`;
+  return `<article class="${cardClass}" data-post-id="${escapeHtml(post.id)}">${header}${preview}<section class="feed-body"><h3>${escapeHtml(post.title)}</h3>${postBodyHtml(post.body)}${attachmentHtml(post)}${actions}</section></article>`;
 }
 function miniAvatarHtml(userId) {
   return avatarMarkup(user(userId), "completion-avatar");

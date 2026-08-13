@@ -1,14 +1,3 @@
-/* Pretendard, bundled: the app ships offline, so no webfont CDN. SIL OFL 1.1,
-   see assets/fonts/PretendardVariable-LICENSE.txt. One variable file covers
-   every weight the UI uses. */
-@font-face {
-  font-family: Pretendard;
-  src: url("assets/fonts/PretendardVariable.woff2") format("woff2");
-  font-weight: 45 920;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   color-scheme: light;
   --bg: #ffffff;
@@ -36,8 +25,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: Pretendard, "Malgun Gothic", "Segoe UI", sans-serif;
-  font-weight: 450;
+  font-family: "Malgun Gothic", "Segoe UI", sans-serif;
   letter-spacing: 0;
 }
 
@@ -1570,6 +1558,7 @@ textarea {
 /* Post editing and readable body text */
 .post-text {
   white-space: pre-line;
+  margin: 0;
 }
 
 .post-tools {
@@ -2565,4 +2554,10 @@ textarea {
     margin-left: 0;
     border-radius: 0;
   }
+}
+
+/* Paragraph rhythm for post bodies: a measured gap where the author left a
+   blank line, instead of pre-line's full empty row. */
+.post-text + .post-text {
+  margin-top: 10px;
 }
