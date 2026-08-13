@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.13-update-button-1";
+const webAppVersion = "2026.08.13-update-visible-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -165,7 +165,17 @@ function desktopUpdateErrorMessage(error) {
 async function installDesktopUpdate() {
   if (!isDesktopApp()) return;
   const version = desktopUpdateInfo?.version || "새 버전";
-  const ok = await confirm(`BigHub ${version} 업데이트를 설치합니다. 설치 중 앱이 자동으로 종료될 수 있습니다.`);
+  // On builds whose dialog permission is missing, the prompt below rejects and
+  // the install used to stop here with nothing on screen -- the user just saw a
+  // dead button. Say so, and point at the manual installer.
+  let ok = false;
+  try {
+    ok = await confirm(`BigHub ${version} 업데이트를 설치합니다. 설치 중 앱이 자동으로 종료될 수 있습니다.`);
+  } catch (error) {
+    clientLog("update-confirm-failed", { message: String(error?.message || error || "") });
+    updateDesktopUpdateStatus("설치 확인 창을 열 수 없습니다. 최신 설치 파일을 직접 내려받아 실행해주세요.", false);
+    return;
+  }
   if (!ok) return;
   updateDesktopUpdateStatus("업데이트 다운로드 및 설치 중...", true);
   clientLog("update-install-start", { version });

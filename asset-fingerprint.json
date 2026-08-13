@@ -1,5 +1,5 @@
 {
-  "webAppVersion": "2026.08.13-update-button-1",
+  "webAppVersion": "2026.08.13-update-visible-1",
   "assets": [
     "styles.css",
     "supabase-config.js",
@@ -10,5 +10,5 @@
     "app-compose.js",
     "app.js"
   ],
-  "sha256": "c544f95f8e047960a5fb0d4b72ed04a5e22a6b80a977e355326e10b536594c3e"
+  "sha256": "50e14ecde029e26cee11815128a01fd94455f54cb4821381eb4a9c9f135083df"
 }
