@@ -1,6 +1,6 @@
 [package]
 name = "bighub"
-version = "0.1.27"
+version = "0.1.28"
 description = "BigHub desktop app"
 authors = ["Bigfile"]
 edition = "2021"

@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-align-drawer-2";
+const webAppVersion = "2026.08.12-drawer-match-post-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -944,9 +944,14 @@ function alignDrawerToPost(postId) {
   if (!drawer) return;
   const card = document.querySelector(`.feed-card[data-post-id="${postId}"]`);
   const column = document.querySelector(".feed-column");
-  if (!card || !column) { drawer.style.marginTop = ""; return; }
-  const offset = Math.round(card.getBoundingClientRect().top - column.getBoundingClientRect().top);
+  if (!card || !column) { drawer.style.marginTop = ""; drawer.style.height = ""; return; }
+  const rect = card.getBoundingClientRect();
+  const offset = Math.round(rect.top - column.getBoundingClientRect().top);
   drawer.style.marginTop = `${Math.max(0, offset)}px`;
+  // Bottom meets the post's too. Floored so a three-line post still leaves room
+  // to read, capped so a very tall post cannot push the input off screen.
+  const usable = Math.min(Math.max(Math.round(rect.height), 200), window.innerHeight - 56);
+  drawer.style.height = `${usable}px`;
 }
 
 function syncCommentButtons() {
@@ -973,6 +978,7 @@ function renderCommentsDrawer() {
     drawer.classList.add("hidden");
     drawer.innerHTML = "";
     drawer.style.marginTop = "";
+    drawer.style.height = "";
     return;
   }
   const comments = state.comments.filter((comment) => comment.postId === post.id);
@@ -980,7 +986,7 @@ function renderCommentsDrawer() {
     ? `<div class="comment-list">${commentsHtml(post.id, comments)}</div>`
     : `<p class="comments-drawer-empty">첫 댓글을 남겨보세요.</p>`;
   drawer.classList.remove("hidden");
-  drawer.innerHTML = `<header class="comments-drawer-head"><strong>댓글 ${comments.length}</strong><button class="modal-close" data-action="close-comments" type="button" aria-label="닫기">×</button></header><div class="comments-drawer-post">${avatarHtml(post.authorId)}<div><strong>${escapeHtml(post.title)}</strong><span>${escapeHtml(userName(post.authorId))} · ${postTypeLabel(post.type)}</span></div></div><div class="comments-drawer-body">${list}</div><form class="inline-form comments-drawer-form" data-action="comment" data-post-id="${escapeHtml(post.id)}"><input id="comment-${escapeHtml(post.id)}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form>`;
+  drawer.innerHTML = `<header class="comments-drawer-head"><strong>댓글 ${comments.length}</strong><button class="modal-close" data-action="close-comments" type="button" aria-label="닫기">×</button></header><div class="comments-drawer-body">${list}</div><form class="inline-form comments-drawer-form" data-action="comment" data-post-id="${escapeHtml(post.id)}"><input id="comment-${escapeHtml(post.id)}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form>`;
   alignDrawerToPost(post.id);
 }
 

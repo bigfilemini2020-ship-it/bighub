@@ -1,5 +1,5 @@
 {
-  "webAppVersion": "2026.08.12-align-drawer-2",
+  "webAppVersion": "2026.08.12-drawer-match-post-1",
   "assets": [
     "styles.css",
     "supabase-config.js",
@@ -10,5 +10,5 @@
     "app-compose.js",
     "app.js"
   ],
-  "sha256": "7eda0eee6a67b1e4dec1f3a0abb13308c0518f3d8b393b88d98580fe2a5ff019"
+  "sha256": "b735faf3a3cb3ad7eba00d65cdc0ef6ab2a16bcf92e2819be1feead5e1616978"
 }
