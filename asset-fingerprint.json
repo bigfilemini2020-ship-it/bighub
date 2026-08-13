@@ -1,5 +1,5 @@
 {
-  "webAppVersion": "2026.08.12-drawer-match-post-1",
+  "webAppVersion": "2026.08.12-drawer-fixed-height-1",
   "assets": [
     "styles.css",
     "supabase-config.js",
@@ -10,5 +10,5 @@
     "app-compose.js",
     "app.js"
   ],
-  "sha256": "b735faf3a3cb3ad7eba00d65cdc0ef6ab2a16bcf92e2819be1feead5e1616978"
+  "sha256": "7e6d5e6eab8a6d001250f499f4999b854a13b8fc8efea7b2fe370d6eb9f448ce"
 }

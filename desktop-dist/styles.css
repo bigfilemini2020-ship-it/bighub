@@ -2489,7 +2489,8 @@ textarea {
      the profile card the panel replaces. */
   top: 28px;
   margin-top: 4px;
-  height: calc(100vh - 56px);
+  /* One size whatever the post's length; only a short window shrinks it. */
+  height: min(660px, calc(100vh - 56px));
   /* Borrows part of the column gap for width, keeping a real gutter from the
      feed cards -- at -56px the panel overlapped them. */
   margin-left: -16px;

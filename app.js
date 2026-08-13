@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-drawer-match-post-1";
+const webAppVersion = "2026.08.12-drawer-fixed-height-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -944,14 +944,9 @@ function alignDrawerToPost(postId) {
   if (!drawer) return;
   const card = document.querySelector(`.feed-card[data-post-id="${postId}"]`);
   const column = document.querySelector(".feed-column");
-  if (!card || !column) { drawer.style.marginTop = ""; drawer.style.height = ""; return; }
-  const rect = card.getBoundingClientRect();
-  const offset = Math.round(rect.top - column.getBoundingClientRect().top);
+  if (!card || !column) { drawer.style.marginTop = ""; return; }
+  const offset = Math.round(card.getBoundingClientRect().top - column.getBoundingClientRect().top);
   drawer.style.marginTop = `${Math.max(0, offset)}px`;
-  // Bottom meets the post's too. Floored so a three-line post still leaves room
-  // to read, capped so a very tall post cannot push the input off screen.
-  const usable = Math.min(Math.max(Math.round(rect.height), 200), window.innerHeight - 56);
-  drawer.style.height = `${usable}px`;
 }
 
 function syncCommentButtons() {
@@ -978,7 +973,6 @@ function renderCommentsDrawer() {
     drawer.classList.add("hidden");
     drawer.innerHTML = "";
     drawer.style.marginTop = "";
-    drawer.style.height = "";
     return;
   }
   const comments = state.comments.filter((comment) => comment.postId === post.id);
