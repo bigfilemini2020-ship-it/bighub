@@ -1,3 +1,14 @@
+/* Pretendard, bundled: the app ships offline, so no webfont CDN. SIL OFL 1.1,
+   see assets/fonts/PretendardVariable-LICENSE.txt. One variable file covers
+   every weight the UI uses. */
+@font-face {
+  font-family: Pretendard;
+  src: url("assets/fonts/PretendardVariable.woff2") format("woff2");
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
   --bg: #ffffff;
@@ -11,6 +22,10 @@
   --done: #0f766e;
   --like: #e11d48;
   --shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-pill: 999px;
 }
 
 * {
@@ -21,7 +36,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: Arial, "Malgun Gothic", sans-serif;
+  font-family: Pretendard, "Malgun Gothic", "Segoe UI", sans-serif;
   letter-spacing: 0;
 }
 
@@ -41,7 +56,7 @@ select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--text);
   padding: 10px 12px;
@@ -81,19 +96,19 @@ textarea {
 .rail-logo {
   width: 38px;
   height: 38px;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   display: grid;
   place-items: center;
   font-weight: 900;
   color: white;
-  background: #111827;
+  background: var(--text);
 }
 
 .rail-button {
   width: 100%;
   min-height: 44px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--text);
   display: flex;
@@ -153,7 +168,7 @@ textarea {
 .question-card,
 .progress-card {
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--surface);
 }
 
@@ -186,7 +201,7 @@ textarea {
 .inline-form button,
 .question-answer-form button {
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--primary);
   color: white;
   padding: 10px 12px;
@@ -201,8 +216,9 @@ textarea {
 
 .filter-chip {
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   background: var(--surface);
+  color: var(--text);
   min-height: 34px;
   padding: 7px 14px;
 }
@@ -253,8 +269,8 @@ textarea {
 
 .avatar.admin,
 .avatar.current {
-  background: #111827;
-  border-color: #111827;
+  background: var(--text);
+  border-color: var(--text);
   color: white;
 }
 
@@ -275,7 +291,7 @@ textarea {
 .post-type {
   flex: 0 0 auto;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 4px 9px;
   font-size: 12px;
   color: var(--muted);
@@ -286,7 +302,7 @@ textarea {
   aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
-  background: #f0f2f5;
+  background: var(--soft);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   overflow: hidden;
@@ -307,7 +323,7 @@ textarea {
   display: grid;
   place-items: center;
   padding: 32px;
-  background: linear-gradient(180deg, #f8fafc, #eef2f7);
+  background: linear-gradient(180deg, var(--soft), var(--soft));
   text-align: center;
 }
 
@@ -321,7 +337,7 @@ textarea {
   width: 74px;
   height: 90px;
   border: 2px solid var(--line-strong);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   display: grid;
   place-items: center;
   background: white;
@@ -341,7 +357,7 @@ textarea {
   height: 36px;
   border: 0;
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   font-size: 21px;
 }
 
@@ -364,7 +380,7 @@ textarea {
   text-decoration: none;
   font-size: 20px;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
 
 .save-link:hover {
@@ -523,7 +539,7 @@ textarea {
 .status-pill {
   display: inline-flex;
   width: fit-content;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 4px 9px;
   margin-bottom: 10px;
   background: var(--soft);
@@ -539,7 +555,7 @@ textarea {
 
 .ghost-button {
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: white;
   padding: 8px 10px;
 }
@@ -558,8 +574,8 @@ textarea {
   height: 9px;
   overflow: hidden;
   margin-top: 12px;
-  border-radius: 999px;
-  background: #e9edf2;
+  border-radius: var(--r-pill);
+  background: var(--line);
 }
 
 .progress-card .bar span {
@@ -570,7 +586,7 @@ textarea {
 
 .empty {
   border: 1px dashed var(--line-strong);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   padding: 34px 18px;
   color: var(--muted);
   text-align: center;
@@ -651,7 +667,7 @@ textarea {
 
 .search-panel {
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   padding: 16px;
   margin-bottom: 18px;
 }
@@ -699,7 +715,7 @@ textarea {
   width: min(820px, calc(100vw - 36px));
   max-height: calc(100vh - 48px);
   overflow: auto;
-  border-radius: 20px;
+  border-radius: var(--r-lg);
   background: white;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
 }
@@ -745,8 +761,8 @@ textarea {
   align-content: center;
   gap: 10px;
   border: 1px dashed var(--line-strong);
-  border-radius: 14px;
-  background: #fbfcfd;
+  border-radius: var(--r-lg);
+  background: var(--soft);
   text-align: center;
 }
 
@@ -764,7 +780,7 @@ textarea {
 .modal-form button[type="submit"] {
   min-height: 44px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: var(--primary);
   color: white;
   font-weight: 800;
@@ -801,10 +817,10 @@ textarea {
   align-items: center;
   gap: 6px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 0 10px;
   background: transparent;
-  color: #0f172a;
+  color: var(--text);
   font-size: 13px;
   font-weight: 700;
 }
@@ -820,7 +836,7 @@ textarea {
 }
 
 .icon-action:hover {
-  background: #f3f6f9;
+  background: var(--soft);
 }
 
 .icon-action.like.active {
@@ -862,13 +878,13 @@ textarea {
   width: 38px;
   height: 38px;
   margin-left: auto;
-  border-radius: 999px;
-  color: #0f172a;
+  border-radius: var(--r-pill);
+  color: var(--text);
   text-decoration: none;
 }
 
 .save-link:hover {
-  background: #f3f6f9;
+  background: var(--soft);
 }
 
 .completion-avatars {
@@ -882,10 +898,10 @@ textarea {
   width: 28px;
   height: 28px;
   margin-left: -8px;
-  border: 2px solid #fff;
-  border-radius: 999px;
-  background: #eef2f7;
-  color: #0f172a;
+  border: 2px solid var(--surface);
+  border-radius: var(--r-pill);
+  background: var(--soft);
+  color: var(--text);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
   display: inline-flex;
   align-items: center;
@@ -900,7 +916,7 @@ textarea {
 }
 
 .completion-avatar.admin-icon {
-  background-color: #0b1220;
+  background-color: var(--text);
   background-image: url("assets/bighub-icon.svg");
   background-position: center;
   background-size: cover;
@@ -908,13 +924,13 @@ textarea {
 }
 
 .completion-avatar.more-count {
-  background: #0f172a;
-  color: #fff;
+  background: var(--text);
+  color: var(--surface);
   font-size: 11px;
 }
 
 .text-card {
-  border-color: #d9dfe7;
+  border-color: var(--line);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
@@ -942,13 +958,13 @@ textarea {
   display: grid;
   place-items: center;
   padding: 32px;
-  background: #f6f8fb;
+  background: var(--soft);
 }
 
 .auth-card {
   width: min(520px, 100%);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   background: white;
   padding: 28px;
   box-shadow: var(--shadow);
@@ -994,8 +1010,8 @@ textarea {
 .auth-form button,
 .mini-button {
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #111827;
+  border-radius: var(--r-sm);
+  background: var(--text);
   color: white;
   padding: 9px 12px;
   font-weight: 800;
@@ -1004,7 +1020,7 @@ textarea {
 .profile-card .mini-button {
   margin-left: auto;
   background: white;
-  color: #111827;
+  color: var(--text);
   font-size: 12px;
 }
 
@@ -1025,7 +1041,7 @@ textarea {
   display: grid;
   gap: 12px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   padding: 14px;
 }
 
@@ -1039,7 +1055,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #374151;
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -1112,12 +1128,12 @@ textarea {
   min-height: 44px;
   border: 1px solid var(--line);
   background: white;
-  color: #111827;
+  color: var(--text);
 }
 
 .auth-form .text-button:hover,
 .auth-form .text-button:focus-visible {
-  border-color: #111827;
+  border-color: var(--text);
 }
 .approval-workspace {
   display: grid;
@@ -1135,8 +1151,8 @@ textarea {
   min-height: 42px;
   padding: 0 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #111827;
+  border-radius: var(--r-sm);
+  background: var(--text);
   color: white;
   font-weight: 700;
   cursor: pointer;
@@ -1173,8 +1189,8 @@ textarea {
   width: min(280px, 100%);
   height: 4px;
   overflow: hidden;
-  border-radius: 999px;
-  background: #e5e7eb;
+  border-radius: var(--r-pill);
+  background: var(--line);
 }
 
 .upload-status i::before {
@@ -1192,8 +1208,8 @@ textarea {
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #f8fafc;
+  border-radius: var(--r-sm);
+  background: var(--soft);
 }
 
 .drive-attachment span {
@@ -1219,8 +1235,8 @@ textarea {
   min-height: 40px;
   padding: 9px 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
+  border-radius: var(--r-sm);
+  background: var(--surface);
   line-height: 1.3;
 }
 
@@ -1258,11 +1274,11 @@ textarea {
 .progress-card,
 .search-panel,
 .empty {
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
 
 .feed-card {
-  border-color: #d8dee7;
+  border-color: var(--line);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
@@ -1272,25 +1288,25 @@ textarea {
 }
 
 .post-type {
-  border-radius: 999px;
-  background: #f8fafc;
-  color: #4b5563;
+  border-radius: var(--r-pill);
+  background: var(--soft);
+  color: var(--muted);
 }
 
 .media-preview {
   aspect-ratio: 4 / 5;
-  background: #f5f6f8;
+  background: var(--soft);
 }
 
 .video-preview {
   aspect-ratio: 16 / 9;
-  background: #0f172a;
+  background: var(--text);
 }
 
 
 .youtube-preview {
   aspect-ratio: 16 / 9;
-  background: #0f172a;
+  background: var(--text);
 }
 
 .youtube-preview iframe {
@@ -1304,12 +1320,12 @@ textarea {
   width: 100%;
   height: 100%;
   display: block;
-  background: #0f172a;
+  background: var(--text);
 }
 
 .media-preview img {
   object-fit: contain;
-  background: #f8fafc;
+  background: var(--soft);
 }
 
 .feed-body {
@@ -1369,7 +1385,7 @@ textarea {
 
 .inline-form input {
   min-height: 42px;
-  background: #f8fafc;
+  background: var(--soft);
 }
 
 .inline-form button {
@@ -1379,23 +1395,23 @@ textarea {
 .drive-attachment {
   min-height: 52px;
   padding: 9px 10px;
-  background: #f8fafc;
+  background: var(--soft);
 }
 
 .drive-attachment span {
   display: grid;
   gap: 2px;
-  color: #4b5563;
+  color: var(--muted);
 }
 
 .drive-attachment strong {
-  color: #111827;
+  color: var(--text);
   font-size: 12px;
 }
 
 .compose-dialog {
   width: min(720px, calc(100vw - 32px));
-  border-radius: 8px;
+  border-radius: var(--r-sm);
 }
 
 .compose-header {
@@ -1403,7 +1419,7 @@ textarea {
   top: 0;
   z-index: 2;
   min-height: 54px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .compose-header h2 {
@@ -1431,7 +1447,7 @@ textarea {
   align-items: center;
   gap: 12px;
   padding: 14px;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   text-align: left;
 }
 
@@ -1455,8 +1471,8 @@ textarea {
   display: grid;
   place-items: center;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
+  border-radius: var(--r-sm);
+  background: var(--surface);
   font-size: 22px;
 }
 
@@ -1466,8 +1482,8 @@ textarea {
 
 .mission-settings {
   gap: 16px;
-  border-radius: 8px;
-  background: #fbfcfd;
+  border-radius: var(--r-sm);
+  background: var(--soft);
 }
 
 .mission-settings legend {
@@ -1517,7 +1533,7 @@ textarea {
   height: 42px;
   flex: 0 0 42px;
   display: block;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
 }
 
@@ -1530,7 +1546,7 @@ textarea {
 .avatar.admin-icon,
 .avatar.current.admin-icon {
   border: 0;
-  background: #111827 url("assets/bighub-icon.svg") center / cover no-repeat;
+  background: var(--text) url("assets/bighub-icon.svg") center / cover no-repeat;
   color: transparent;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
 }
@@ -1542,8 +1558,8 @@ textarea {
   bottom: -1px;
   width: 11px;
   height: 11px;
-  border: 2px solid #fff;
-  border-radius: 999px;
+  border: 2px solid var(--surface);
+  border-radius: var(--r-pill);
   background: #22c55e;
 }
 
@@ -1565,9 +1581,9 @@ textarea {
 .post-edit-button {
   min-height: 30px;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  color: #4b5563;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--muted);
   padding: 0 10px;
   font-size: 12px;
   font-weight: 700;
@@ -1575,9 +1591,9 @@ textarea {
 
 .post-edit-button:hover,
 .post-edit-button:focus-visible {
-  border-color: #111827;
-  color: #111827;
-  background: #f8fafc;
+  border-color: var(--text);
+  color: var(--text);
+  background: var(--soft);
 }
 
 @media (max-width: 560px) {
@@ -1661,9 +1677,9 @@ textarea {
   width: 32px;
   height: 32px;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  color: #111827;
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1681,8 +1697,8 @@ textarea {
   z-index: 20;
   min-width: 132px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
+  border-radius: var(--r-sm);
+  background: var(--surface);
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
   overflow: hidden;
 }
@@ -1691,8 +1707,8 @@ textarea {
   width: 100%;
   min-height: 40px;
   border: 0;
-  background: #fff;
-  color: #111827;
+  background: var(--surface);
+  color: var(--text);
   text-align: left;
   padding: 0 14px;
   font-size: 14px;
@@ -1700,7 +1716,7 @@ textarea {
 
 .post-menu-popover button:hover,
 .post-menu-popover button:focus-visible {
-  background: #f8fafc;
+  background: var(--soft);
 }
 
 .post-menu-popover .danger {
@@ -1732,14 +1748,14 @@ textarea {
 .comment-avatar {
   width: 30px;
   height: 30px;
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  border: 1px solid #d9e0ea;
-  background: #eef2f7;
-  color: #0f172a;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--text);
   font-size: 12px;
   font-weight: 800;
 }
@@ -1751,7 +1767,7 @@ textarea {
 }
 
 .comment-avatar.admin-icon {
-  background: #111827 url("assets/bighub-icon.svg") center / cover no-repeat;
+  background: var(--text) url("assets/bighub-icon.svg") center / cover no-repeat;
   color: transparent;
 }
 
@@ -1761,7 +1777,7 @@ textarea {
 
 .comment-content p {
   margin: 0;
-  color: #0f172a;
+  color: var(--text);
   font-size: 14px;
   line-height: 1.55;
   overflow-wrap: anywhere;
@@ -1786,9 +1802,9 @@ textarea {
   min-height: 32px;
   min-width: 32px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: transparent;
-  color: #64748b;
+  color: var(--muted);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -1798,7 +1814,7 @@ textarea {
 
 .comment-tools button:hover,
 .comment-tools button:focus-visible {
-  color: #0f172a;
+  color: var(--text);
 }
 
 .reply-list {
@@ -1873,7 +1889,7 @@ textarea {
 .completion-avatar.image-avatar,
 .comment-avatar.image-avatar {
   overflow: hidden;
-  background: #f8fafc;
+  background: var(--soft);
   color: transparent;
 }
 
@@ -1979,14 +1995,14 @@ textarea {
 .settings-head p,
 .settings-status {
   margin: 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 14px;
 }
 
 .settings-card {
-  border: 1px solid #dbe2ea;
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
   overflow: hidden;
 }
 
@@ -1996,7 +2012,7 @@ textarea {
   justify-content: space-between;
   gap: 18px;
   padding: 18px 20px;
-  border-bottom: 1px solid #eef2f6;
+  border-bottom: 1px solid var(--soft);
 }
 
 .setting-row:last-child {
@@ -2010,18 +2026,18 @@ textarea {
 
 .setting-row strong {
   font-size: 15px;
-  color: #101828;
+  color: var(--text);
 }
 
 .setting-row small {
-  color: #667085;
+  color: var(--muted);
   line-height: 1.45;
 }
 
 .setting-row input[type="checkbox"] {
   width: 20px;
   height: 20px;
-  accent-color: #101828;
+  accent-color: var(--text);
   flex: 0 0 auto;
 }
 
@@ -2040,7 +2056,7 @@ textarea {
 .image-preview {
   aspect-ratio: auto;
   display: block;
-  background: #fff;
+  background: var(--surface);
 }
 
 .image-preview img {
@@ -2048,7 +2064,7 @@ textarea {
   height: auto;
   max-height: 720px;
   object-fit: contain;
-  background: #fff;
+  background: var(--surface);
 }
 
 .drive-image-preview {
@@ -2065,7 +2081,7 @@ textarea {
   display: grid;
   place-items: center;
   color: #1d4ed8;
-  background: #f8fafc;
+  background: var(--soft);
 }
 
 .drive-image-preview.load-failed img {
@@ -2077,9 +2093,9 @@ textarea {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: 8px 13px;
-  background: #fff;
+  background: var(--surface);
   font-size: 13px;
   font-weight: 700;
 }
@@ -2168,7 +2184,7 @@ textarea {
   max-width: min(300px, 80vw);
   padding: 6px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--surface);
   box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
   display: grid;
@@ -2182,7 +2198,7 @@ textarea {
 .download-menu-popover button,
 .download-menu-popover a {
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--text);
   cursor: pointer;
@@ -2254,7 +2270,7 @@ textarea {
 
 .upload-drop.drag-over {
   border-color: var(--primary);
-  background: #f5f8ff;
+  background: var(--soft);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10) inset;
 }
 
@@ -2342,8 +2358,8 @@ textarea {
   min-width: 0;
   padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
+  border-radius: var(--r-md);
+  background: var(--surface);
 }
 
 .selected-file-row span {
@@ -2383,10 +2399,10 @@ textarea {
   gap: 8px 14px;
   width: min(340px, calc(100vw - 32px));
   padding: 14px 16px 16px;
-  border: 1px solid #dbe3ee;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #0f172a;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--text);
   box-shadow: 0 16px 38px rgba(15, 23, 42, 0.18);
 }
 
@@ -2400,7 +2416,7 @@ textarea {
 }
 
 .download-toast span {
-  color: #64748b;
+  color: var(--muted);
   font-size: 12px;
   font-weight: 700;
 }
@@ -2410,8 +2426,8 @@ textarea {
   display: block;
   height: 5px;
   overflow: hidden;
-  border-radius: 999px;
-  background: #e5e7eb;
+  border-radius: var(--r-pill);
+  background: var(--line);
 }
 
 .download-toast i::before {
@@ -2438,8 +2454,8 @@ textarea {
 
 .approval-actions { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; }
 .approval-actions .mini-button { min-width: 58px; }
-.mini-button.secondary { background: #ffffff; color: #111827; border-color: #d8dee8; }
-.mini-button.secondary:hover { background: #f3f6fb; }
+.mini-button.secondary { background: var(--surface); color: var(--text); border-color: var(--line); }
+.mini-button.secondary:hover { background: var(--soft); }
 
 /* Refresh feedback: the button only went disabled, which is invisible on a
    transparent rail button, so a click looked like nothing happened. The glyph
@@ -2459,9 +2475,9 @@ textarea {
   content: "";
   position: absolute;
   inset: 3px;
-  border-radius: 999px;
-  border: 2px solid #cbd5e1;
-  border-top-color: #0f172a;
+  border-radius: var(--r-pill);
+  border: 2px solid var(--line);
+  border-top-color: var(--text);
   animation: bighub-spin 0.6s linear infinite;
 }
 
@@ -2472,7 +2488,7 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
   .rail-button.is-busy span::after {
     animation: none;
-    border-top-color: #cbd5e1;
+    border-top-color: var(--line);
     opacity: 0.6;
   }
 }
@@ -2496,9 +2512,9 @@ textarea {
   margin-left: -16px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   overflow: hidden;
 }
 
@@ -2535,7 +2551,7 @@ textarea {
 .comments-drawer-form {
   padding: 12px 16px;
   border-top: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
 }
 
 /* Narrow windows drop the side panel, so the drawer covers the feed instead. */
