@@ -1,5 +1,5 @@
 {
-  "webAppVersion": "2026.08.12-system-font-paragraphs-1",
+  "webAppVersion": "2026.08.12-keep-player-alive-1",
   "assets": [
     "styles.css",
     "supabase-config.js",
@@ -10,5 +10,5 @@
     "app-compose.js",
     "app.js"
   ],
-  "sha256": "7cc1872512de358a909976cbb4db77bd9a10a62fffc55eee19d5187c0148494a"
+  "sha256": "6d548f6ec3f7760a7e727cbf518abe1600aceb5805d8801466dd84be0120f657"
 }

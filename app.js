@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.12-system-font-paragraphs-1";
+const webAppVersion = "2026.08.12-keep-player-alive-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -898,26 +898,32 @@ function canManagePost(post) { const item = currentUser(); if (!item) return fal
 function canEditPost(post) { return canManagePost(post); }
 function hasCompletionCheck(post) { return Array.isArray(post.completionRules) && post.completionRules.includes("done"); }
 
+// Writing innerHTML tears down and rebuilds every embedded player, so a render
+// that produces the same feed would still stop a playing YouTube video. The
+// <video> guard cannot see into a cross-origin iframe, and window focus alone
+// triggers a sync: clicking any empty space after starting a video was enough.
+let lastFeedMarkup = null;
+
 function renderFeed() {
   const target = byId("postList");
   document.querySelectorAll(".filter-chip").forEach((button) => button.classList.toggle("active", button.dataset.filter === postFilter));
+  let markup;
   try {
     const posts = sortFeedPosts(state.posts.filter((post) => postFilter === "all" || post.type === postFilter));
-    if (!posts.length) {
-      target.innerHTML = emptyHtml();
-      return;
-    }
-    target.innerHTML = posts.map((post) => {
+    markup = posts.length ? posts.map((post) => {
       try { return postCardHtml(post); }
       catch (error) {
         console.warn("Post render failed", post, error);
         return `<article class="feed-card text-card"><section class="feed-body"><h3>${escapeHtml(post.title || "게시글 표시 오류")}</h3><p class="post-text">게시글을 표시하는 중 문제가 발생했습니다.</p></section></article>`;
       }
-    }).join("");
+    }).join("") : emptyHtml();
   } catch (error) {
     console.warn("Feed render failed", error);
-    target.innerHTML = emptyHtml();
-    return;
+    markup = emptyHtml();
+  }
+  if (markup !== lastFeedMarkup || !target.firstElementChild) {
+    target.innerHTML = markup;
+    lastFeedMarkup = markup;
   }
   hydrateDriveVideos();
   hydrateMuxVideos();
