@@ -123,7 +123,7 @@ textarea {
 }
 
 .feed-layout {
-  width: min(1180px, calc(100vw - 244px));
+  width: min(1180px, 100%);
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(420px, 560px) 330px;
@@ -436,6 +436,10 @@ textarea {
 }
 
 .side-panel {
+  /* Pinned so the comments drawer can share this cell. Without it, an open
+     drawer takes the cell and auto-placement drops the panel into row 2. */
+  grid-column: 2;
+  grid-row: 1;
   position: sticky;
   top: 24px;
   height: calc(100vh - 48px);
@@ -1232,7 +1236,7 @@ textarea {
 }
 /* SNS feed polish */
 .feed-layout {
-  width: min(1060px, calc(100vw - 244px));
+  width: min(1060px, 100%);
   grid-template-columns: minmax(440px, 560px) 300px;
   gap: 44px;
   padding-top: 18px;
@@ -1654,8 +1658,8 @@ textarea {
 }
 
 .post-menu-button {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
@@ -1772,20 +1776,24 @@ textarea {
 .comment-tools {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 3px;
+  gap: 4px;
+  /* Negative inline margin keeps the row visually flush while the buttons
+     themselves carry padding, so they are big enough to hit. */
+  margin: 3px 0 0 -8px;
 }
 
 .comment-tools button {
-  min-height: 28px;
+  min-height: 32px;
+  min-width: 32px;
   border: 0;
+  border-radius: 6px;
   background: transparent;
   color: #64748b;
   cursor: pointer;
   font: inherit;
   font-size: 12px;
   font-weight: 700;
-  padding: 0;
+  padding: 4px 8px;
 }
 
 .comment-tools button:hover,
@@ -2508,9 +2516,14 @@ textarea {
   grid-row: 1;
   z-index: 6;
   position: sticky;
-  top: 24px;
-  height: calc(100vh - 48px);
-  margin-left: -56px;
+  /* 4px below the row start, so the header lines up with the filter chips and
+     the profile card the panel replaces. */
+  top: 28px;
+  margin-top: 4px;
+  height: calc(100vh - 56px);
+  /* Borrows part of the column gap for width, keeping a real gutter from the
+     feed cards -- at -56px the panel overlapped them. */
+  margin-left: -16px;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   background: #fff;
