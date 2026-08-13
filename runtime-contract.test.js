@@ -176,6 +176,31 @@ test("the update check never waits on a dialog while holding its guard", () => {
   }
 });
 
+// Dialogs stack and each listens on the document, so a key press used to answer
+// every open one: an Enter clearing a notice also confirmed the delete waiting
+// underneath. Only the topmost may respond, and the key must not reach the page.
+test("only the topmost dialog answers a key press", () => {
+  for (const dir of [".", "desktop-dist"]) {
+    const app = fs.readFileSync(path.join(__dirname, dir, "app.js"), "utf8");
+    const start = app.indexOf("const onKey = (event) =>");
+    assert.ok(start > -1, `${dir}: showAppDialog must handle keys`);
+    const body = app.slice(start, app.indexOf("};", start));
+    assert.match(body, /dialogs\[dialogs\.length - 1\] !== host/, `${dir}: skip unless topmost`);
+    assert.match(body, /event\.preventDefault\(\)/, `${dir}: the key must not reach the page`);
+  }
+});
+
+// A drawer anchored to a post that filtering removed sat beside an unrelated
+// card and took comments for the one nobody could see.
+test("the comments drawer closes with the post it is anchored to", () => {
+  for (const dir of [".", "desktop-dist"]) {
+    const app = fs.readFileSync(path.join(__dirname, dir, "app.js"), "utf8");
+    assert.match(app, /if \(!alignDrawerToPost\(post\.id\)\) \{/, `${dir}: close when the card is gone`);
+    assert.match(app, /renderFeed\(\); syncCommentButtons\(\);/, `${dir}: the filter chips must resync the drawer`);
+    assert.doesNotMatch(app, /postMessage\([^)]*"\*"\)/, `${dir}: address the player, not every origin`);
+  }
+});
+
 // The dialog plugin kept refusing: bighub-client.log recorded
 // "plugin:dialog|confirm not allowed by ACL" even on builds whose capability
 // lists dialog:allow-confirm. A refused dialog rejects, so nothing appears and

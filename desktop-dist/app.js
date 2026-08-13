@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.13-in-app-dialogs-1";
+const webAppVersion = "2026.08.13-review-fixes-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -472,8 +472,15 @@ function showAppDialog(message, options = {}) {
       resolve(value);
     };
     const onKey = (event) => {
-      if (event.key === "Escape") close(false);
-      if (event.key === "Enter") close(true);
+      if (event.key !== "Escape" && event.key !== "Enter") return;
+      // Dialogs stack, and each one listens on the document. Without this the
+      // topmost dismissal answered every open dialog -- an Enter meant to clear
+      // a notice also confirmed a delete the reader never saw.
+      const dialogs = document.querySelectorAll(".app-dialog");
+      if (dialogs[dialogs.length - 1] !== host) return;
+      event.preventDefault();
+      event.stopPropagation();
+      close(event.key === "Enter");
     };
     host.addEventListener("click", (event) => {
       const choice = event.target.closest("[data-dialog]")?.dataset.dialog;
@@ -638,7 +645,7 @@ function pauseMediaElement(element) {
     if (!element.paused) element.pause();
     return;
   }
-  element.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), "*");
+  element.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), "https://www.youtube-nocookie.com");
 }
 
 function watchMediaLeavingView() {
@@ -670,7 +677,7 @@ function bindNavigation() {
   document.querySelectorAll(".rail-button[data-view]").forEach((button) => button.addEventListener("click", () => { activeView = button.dataset.view; render(); }));
   document.querySelector("[data-action='compose-focus']").addEventListener("click", openComposeModal);
   document.querySelectorAll("[data-action='close-compose']").forEach((item) => item.addEventListener("click", closeComposeModal));
-  document.querySelectorAll(".filter-chip").forEach((button) => button.addEventListener("click", () => { postFilter = button.dataset.filter; saveFeedPosition(); renderFeed(); }));
+  document.querySelectorAll(".filter-chip").forEach((button) => button.addEventListener("click", () => { postFilter = button.dataset.filter; saveFeedPosition(); renderFeed(); syncCommentButtons(); }));
   window.addEventListener("scroll", scheduleSaveFeedPosition, { passive: true });
   window.addEventListener("beforeunload", saveFeedPosition);
   window.addEventListener("focus", syncRemoteData);
@@ -1032,12 +1039,13 @@ function sortFeedPosts(posts) {
 // comments, so only the tops meet.
 function alignDrawerToPost(postId) {
   const drawer = byId("commentsDrawer");
-  if (!drawer) return;
+  if (!drawer) return false;
   const card = document.querySelector(`.feed-card[data-post-id="${postId}"]`);
   const column = document.querySelector(".feed-column");
-  if (!card || !column) { drawer.style.marginTop = ""; return; }
+  if (!card || !column) return false;
   const offset = Math.round(card.getBoundingClientRect().top - column.getBoundingClientRect().top);
   drawer.style.marginTop = `${Math.max(0, offset)}px`;
+  return true;
 }
 
 function syncCommentButtons() {
@@ -1072,7 +1080,15 @@ function renderCommentsDrawer() {
     : `<p class="comments-drawer-empty">첫 댓글을 남겨보세요.</p>`;
   drawer.classList.remove("hidden");
   drawer.innerHTML = `<header class="comments-drawer-head"><strong>댓글 ${comments.length}</strong><button class="modal-close" data-action="close-comments" type="button" aria-label="닫기">×</button></header><div class="comments-drawer-body">${list}</div><form class="inline-form comments-drawer-form" data-action="comment" data-post-id="${escapeHtml(post.id)}"><input id="comment-${escapeHtml(post.id)}" name="body" placeholder="댓글을 입력하세요." required /><button type="submit">게시</button></form>`;
-  alignDrawerToPost(post.id);
+  // Filtering the feed, or leaving it, takes the post off screen. An anchored
+  // drawer would then sit beside an unrelated card and take comments for the
+  // one nobody can see, so it closes with its post.
+  if (!alignDrawerToPost(post.id)) {
+    openCommentPostIds.clear();
+    drawer.classList.add("hidden");
+    drawer.innerHTML = "";
+    drawer.style.marginTop = "";
+  }
 }
 
 function canManageComment(comment) {

@@ -1,5 +1,5 @@
 {
-  "webAppVersion": "2026.08.13-in-app-dialogs-1",
+  "webAppVersion": "2026.08.13-review-fixes-1",
   "assets": [
     "styles.css",
     "supabase-config.js",
@@ -10,5 +10,5 @@
     "app-compose.js",
     "app.js"
   ],
-  "sha256": "f51c5316e562d511b4ae80c37524068927e3e2ad1aa1895dfb368f1896819b10"
+  "sha256": "1aaf042f1ee5e4727e954ac8cce8a4c9a5551d6eaca7a9ff3168d212a5f60713"
 }
