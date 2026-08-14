@@ -3,7 +3,7 @@ const uploadedAttachmentKey = "bighub-uploaded-attachment-v1";
 const feedPositionKey = "bighub-feed-position-v1";
 const desktopSettingsKey = "bighub-desktop-settings-cache-v1";
 const clientLogKey = "bighub-client-log-v1";
-const webAppVersion = "2026.08.13-review-fixes-1";
+const webAppVersion = "2026.08.14-feed-order-1";
 const S = window.EducationState;
 
 let state = loadState();
@@ -304,9 +304,7 @@ function restoreFeedPosition() {
   const saved = readFeedPosition();
   requestAnimationFrame(() => requestAnimationFrame(() => {
     if (!saved || saved.userId !== currentUserId) {
-      const cards = Array.from(document.querySelectorAll(".feed-card[data-post-id]"));
-      const firstPost = cards[cards.length - 1];
-      if (firstPost) firstPost.scrollIntoView({ block: "start" });
+      window.scrollTo(0, 0);
       return;
     }
     const target = Array.from(document.querySelectorAll(".feed-card[data-post-id]")).find((card) => card.dataset.postId === saved.postId);
@@ -1021,12 +1019,13 @@ function renderFeed() {
   watchMediaLeavingView();
 }
 
+// 피드는 위에서 아래로 읽는다: 안내 글이 맨 위, 최신 글이 맨 아래.
 function sortFeedPosts(posts) {
   return [...posts].sort((a, b) => {
     const aIntro = a.title === "BigHub 사용 안내";
     const bIntro = b.title === "BigHub 사용 안내";
-    if (aIntro !== bIntro) return aIntro ? 1 : -1;
-    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    if (aIntro !== bIntro) return aIntro ? -1 : 1;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
   });
 }
 

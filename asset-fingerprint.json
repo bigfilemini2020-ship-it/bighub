@@ -1,5 +1,5 @@
 {
-  "webAppVersion": "2026.08.13-review-fixes-1",
+  "webAppVersion": "2026.08.14-feed-order-1",
   "assets": [
     "styles.css",
     "supabase-config.js",
@@ -10,5 +10,5 @@
     "app-compose.js",
     "app.js"
   ],
-  "sha256": "1aaf042f1ee5e4727e954ac8cce8a4c9a5551d6eaca7a9ff3168d212a5f60713"
+  "sha256": "6ef447f9981ef33f599e71577b46928c2e102a6164a5c6d520f1cce04c8ec37b"
 }

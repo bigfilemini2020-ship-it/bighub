@@ -270,3 +270,29 @@ test("signup lifecycle does not retain rejected requests", () => {
   assert.doesNotMatch(requestSignup, /existing_request_status = 'rejected'/);
   assert.doesNotMatch(requestSignup, /status = 'rejected'/);
 });
+// 피드는 위에서 아래로 읽는다. 정렬이 뒤집히면 첫 실행 스크롤(맨 위)과 글 작성
+// 직후 스크롤(맨 아래)이 둘 다 엉뚱한 글을 가리킨다.
+test("feed sorts oldest-first with the intro post pinned to the top", () => {
+  for (const dir of [".", "desktop-dist"]) {
+    const source = fs.readFileSync(path.join(__dirname, dir, "app.js"), "utf8");
+    const body = source.match(/function sortFeedPosts\(posts\) \{[\s\S]*?\n\}/)?.[0];
+    assert.ok(body, `${dir}/app.js must define sortFeedPosts`);
+    const sortFeedPosts = new Function(`${body}; return sortFeedPosts;`)();
+    const order = sortFeedPosts([
+      { title: "새 글", createdAt: "2026-08-14T00:00:00Z" },
+      { title: "옛 글", createdAt: "2026-08-01T00:00:00Z" },
+      { title: "BigHub 사용 안내", createdAt: "2026-08-10T00:00:00Z" },
+    ]).map((post) => post.title);
+    assert.deepEqual(order, ["BigHub 사용 안내", "옛 글", "새 글"], `${dir}/app.js feed order`);
+  }
+});
+
+// 저장된 위치가 없으면 피드 맨 위(= 안내 글)에서 시작해야 한다.
+test("a first run starts at the top of the feed", () => {
+  for (const dir of [".", "desktop-dist"]) {
+    const app = fs.readFileSync(path.join(__dirname, dir, "app.js"), "utf8");
+    const restore = app.match(/function restoreFeedPosition\(\)[\s\S]*?\n\}/)?.[0];
+    assert.ok(restore, `${dir}/app.js must define restoreFeedPosition`);
+    assert.match(restore, /saved\.userId !== currentUserId\) \{\s*window\.scrollTo\(0, 0\);/, `${dir} first run must scroll to the top`);
+  }
+});

@@ -172,7 +172,11 @@ function bindForms() {
       clientLog("post-render-start");
       render();
       clientLog("post-render-done");
-      window.scrollTo(0, 0);
+      // 최신 글이 피드 맨 아래에 붙으므로, 방금 쓴 글로 내려가야 보인다.
+      const cards = document.querySelectorAll("#postList .feed-card[data-post-id]");
+      const newest = cards[cards.length - 1];
+      if (newest) { newest.scrollIntoView({ block: "start" }); window.scrollBy(0, -88); }
+      else window.scrollTo(0, 0);
     } catch (error) {
       clientLog("post-submit-error", { message: error.message || String(error || ""), name: error.name || "" });
       setUploadStatus(error.message || "파일 업로드에 실패했습니다.");
